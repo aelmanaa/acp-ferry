@@ -64,6 +64,27 @@ unknown outcome is never `completed`.
 
 Until agents implement these, a client builds the document from the agent's session store.
 
+The document's JSON Schema (draft 2020-12, version 0) is
+[`packages/spec/session-export.schema.json`](../../packages/spec/session-export.schema.json). It is
+written by hand. `@acp-ferry/spec` exports the same schema as `sessionExportSchema` and a validator,
+`parseSessionExport`, that needs no dependency. The validator returns an error that names the JSON
+path of the first bad field and never repeats the field's value. A reader checks a document before
+it seeds an agent with it.
+
+| Limit                                                       | Value     |
+| ----------------------------------------------------------- | --------- |
+| Transcript entries                                          | 10,000    |
+| Items in `plan` and in `losses`                             | 1,000     |
+| Text (transcript text, tool input and output, plan, losses) | 1,000,000 |
+| Names, paths, address, model id, timestamp                  | 4,096     |
+
+Lengths count Unicode code points. Every object rejects unknown fields, so a document from a newer
+writer fails with the path of the new field. The unit tests check that Ajv with the schema and
+`parseSessionExport` accept and reject the same documents. Two differences remain outside that
+corpus: the validator requires a `T` and a `Z` or `±hh:mm` offset in `exportedAt`, as RFC 3339 says,
+and the address pattern does not check that percent-encoded bytes are UTF-8; `parseSessionAddress`
+does.
+
 ### 5. Limit events
 
 A `session/update` variant reporting `rate-limit`, `quota-exhausted`, `budget-exceeded` or

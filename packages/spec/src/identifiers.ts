@@ -19,6 +19,34 @@ const SESSION = /^[A-Za-z0-9._~%-]+$/;
 const SCHEME = "acp://";
 
 /**
+ * The form of a {@link ModelId} as one regular expression, as a string for JSON Schema `pattern`.
+ * It accepts exactly the strings {@link parseModelId} accepts (R-ID-2).
+ *
+ * @example
+ * ```ts
+ * new RegExp(MODEL_ID_PATTERN, "u").test("openai/gpt-5"); // true
+ * ```
+ * @experimental
+ */
+export const MODEL_ID_PATTERN =
+  "^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9](?:[A-Za-z0-9._:@/+-]*[A-Za-z0-9._:@+-])?$";
+
+/**
+ * PROPOSAL. The form of a {@link SessionAddressString} as one regular expression, as a string for
+ * JSON Schema `pattern` (R-ID-3). It checks the form only: a session part with a percent-encoded
+ * byte sequence that is not UTF-8, such as `%ff`, matches here but fails
+ * {@link parseSessionAddress}, which decodes it.
+ *
+ * @example
+ * ```ts
+ * new RegExp(SESSION_ADDRESS_PATTERN, "u").test("acp://localhost/codex-acp/abc"); // true
+ * ```
+ * @experimental
+ */
+export const SESSION_ADDRESS_PATTERN =
+  "^acp://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?/[a-z0-9][a-z0-9._-]*/(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+$";
+
+/**
  * Checks an agent id against the ACP Registry id form (R-ID-1).
  *
  * @param value - Any string, for example from configuration.

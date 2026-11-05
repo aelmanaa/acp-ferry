@@ -5,7 +5,8 @@ lets a coding agent discover, delegate to, message and hand sessions to another 
 machine, with a choice of model.
 
 Status: in design; nothing is published to npm yet. The repository has the toolchain, a typed draft
-contract (`packages/spec/src/types.ts`), identifier parsers, the plan, and the first broker code:
+contract (`packages/spec/src/types.ts`), identifier parsers, the `SessionExport` JSON Schema and
+validator, the plan, and the first broker code:
 the workspace state reader for session exports.
 
 ## Start here
@@ -51,16 +52,16 @@ natively. pnpm 12.16.1 (`packageManager`).
 
 ## Where things are
 
-| Path                    | Contents                                                                                                                     |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `packages/spec/src/`    | Draft types and identifier parsers. Runtime-neutral: no Node built-ins (lint rule and a build without Node types enforce it) |
-| `packages/broker/src/`  | The broker. Node-only. Today: the workspace state reader (`workspace.ts`)                                                    |
-| `packages/*/test/unit/` | Unit tests, `*.test.ts`                                                                                                      |
-| `scripts/`              | Repository scripts run with plain `node`: git hooks, type-escape check, test runner                                          |
-| `docs/user/`            | User documentation (written as features land)                                                                                |
-| `docs/contributor/`     | Requirements, architecture, spec draft, roadmap, decisions, prior art, testing, tooling, releasing                           |
-| `.github/`              | CI, issue and pull request templates, Dependabot, CODEOWNERS                                                                 |
-| `.changeset/`           | Pending release notes                                                                                                        |
+| Path                    | Contents                                                                                                                                                    |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/spec/src/`    | Draft types, identifier parsers and the `SessionExport` validator. Runtime-neutral: no Node built-ins (lint rule and a build without Node types enforce it) |
+| `packages/broker/src/`  | The broker. Node-only. Today: the workspace state reader (`workspace.ts`)                                                                                   |
+| `packages/*/test/unit/` | Unit tests, `*.test.ts`                                                                                                                                     |
+| `scripts/`              | Repository scripts run with plain `node`: git hooks, type-escape check, test runner                                                                         |
+| `docs/user/`            | User documentation (written as features land)                                                                                                               |
+| `docs/contributor/`     | Requirements, architecture, spec draft, roadmap, decisions, prior art, testing, tooling, releasing                                                          |
+| `.github/`              | CI, issue and pull request templates, Dependabot, CODEOWNERS                                                                                                |
+| `.changeset/`           | Pending release notes                                                                                                                                       |
 
 ## Rules for every change
 

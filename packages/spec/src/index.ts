@@ -5,6 +5,11 @@ export {
   parseModelId,
   parseSessionAddress,
 } from "./identifiers.ts";
+export {
+  parseSessionExport,
+  SESSION_EXPORT_LIMITS,
+  sessionExportSchema,
+} from "./session-export.ts";
 export type {
   AgentDescriptor,
   AgentId,
