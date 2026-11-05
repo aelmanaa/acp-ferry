@@ -1,0 +1,12 @@
+{"timestamp":"2026-11-05T13:00:00.000Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000004","timestamp":"2026-11-05T13:00:00.000Z","cwd":"/workspace/codex-demo","cli_version":"0.162.1","source":"cli","model_provider":"ollama"}}
+{"timestamp":"2026-11-05T13:00:01.000Z","type":"turn_context","payload":{"turn_id":"turn-1","model":"llama-fixture:8b"}}
+{"timestamp":"2026-11-05T13:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Explain the build."}]}}
+{"timestamp":"2026-11-05T13:00:02.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"It runs tsc."}]}}
+{"timestamp":"2026-11-05T13:00:03.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"And the tests?"}]}}
+{"timestamp":"2026-11-05T13:00:04.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"They run with node --test."}]}}
+{"timestamp":"2026-11-05T13:00:05.000Z","type":"compacted","payload":{"message":"The user asked about the build (tsc) and the tests (node --test).","replacement_history":[{"type":"message","role":"user","content":[{"type":"input_text","text":"Explain the build."}]}]}}
+{"timestamp":"2026-11-05T13:00:05.000Z","type":"event_msg","payload":{"type":"context_compacted"}}
+{"timestamp":"2026-11-05T13:00:06.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Now add a lint step."}]}}
+{"timestamp":"2026-11-05T13:00:07.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Added oxlint."}]}}
+{"timestamp":"2026-11-05T13:00:08.000Z","type":"compacted","payload":{"message":"","replacement_history":[{"type":"compaction","encrypted_content":"FIXTURE-ENCRYPTED-MARKER"}]}}
+{"timestamp":"2026-11-05T13:00:09.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Thanks."}]}}

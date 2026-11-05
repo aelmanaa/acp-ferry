@@ -1,0 +1,11 @@
+{"timestamp":"2026-11-05T16:00:00.000Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000007","timestamp":"2026-11-05T16:00:00.000Z","cwd":"/workspace/codex-demo","cli_version":"0.162.1","source":"cli","model_provider":"openai"}}
+{"timestamp":"2026-11-05T16:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Review the change with a helper agent."}]}}
+{"timestamp":"2026-11-05T16:00:02.000Z","type":"response_item","payload":{"type":"function_call","namespace":"collaboration","name":"spawn_agent","arguments":"{\"task_name\":\"review\",\"message\":\"FIXTURE-SUBAGENT-MARKER\"}","call_id":"agent-1"}}
+{"timestamp":"2026-11-05T16:00:02.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"agent-1","output":"{\"task_name\":\"review\"}"}}
+{"timestamp":"2026-11-05T16:00:03.000Z","type":"inter_agent_communication","payload":{"author":"review","recipient":"root","content":"FIXTURE-SUBAGENT-MARKER"}}
+{"timestamp":"2026-11-05T16:00:03.000Z","type":"inter_agent_communication_metadata","payload":{"trigger_turn":true}}
+{"timestamp":"2026-11-05T16:00:04.000Z","type":"response_item","payload":{"type":"agent_message","author":"review","recipient":"root","content":[{"type":"input_text","text":"FIXTURE-SUBAGENT-MARKER"}]}}
+{"timestamp":"2026-11-05T16:00:05.000Z","type":"response_item","payload":{"type":"function_call","name":"wait_agent","arguments":"{}","call_id":"agent-2"}}
+{"timestamp":"2026-11-05T16:00:05.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"agent-2","output":"{\"message\":\"FIXTURE-SUBAGENT-MARKER\",\"timed_out\":false}"}}
+{"timestamp":"2026-11-05T16:00:06.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"<subagent_notification>FIXTURE-SUBAGENT-MARKER</subagent_notification>"}]}}
+{"timestamp":"2026-11-05T16:00:07.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The review found no problems."}]}}

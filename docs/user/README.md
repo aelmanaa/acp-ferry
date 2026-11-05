@@ -8,6 +8,8 @@ Pages so far:
   directory and git checkout, and the errors when it cannot.
 - [Redaction](reference/redaction.md): which credential-shaped text an export replaces, and which
   files it never exports.
+- [Codex session reader](reference/codex-reader.md): how a Codex rollout becomes a session export,
+  and what the export drops.
 
 Pages land with the features they describe, in four kinds (the Diátaxis layout):
 
