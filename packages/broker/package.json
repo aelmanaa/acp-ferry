@@ -2,7 +2,7 @@
   "name": "@acp-ferry/broker",
   "version": "0.0.0",
   "private": true,
-  "description": "Local broker for the acp-ferry draft Agent Client Protocol (ACP) extension. Early work: reads the workspace state for session exports.",
+  "description": "Local broker for the acp-ferry draft Agent Client Protocol (ACP) extension. Early work: reads the workspace state, redacts and renders session exports.",
   "keywords": [
     "agent-client-protocol",
     "acp",

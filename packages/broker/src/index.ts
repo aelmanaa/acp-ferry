@@ -36,3 +36,11 @@ export type { CodexReaderErrorCode, ReadCodexSessionOptions } from "./readers/co
 
 export { CLAUDE_AGENT_ID, ClaudeReaderError, readClaudeSession } from "./readers/claude.ts";
 export type { ClaudeReaderErrorCode, ReadClaudeSessionOptions } from "./readers/claude.ts";
+
+export {
+  formatHandoffMarker,
+  parseHandoffMarker,
+  renderSeedPrompt,
+  SEED_PROMPT_DEFAULTS,
+} from "./handoff/render.ts";
+export type { RenderSeedPromptOptions, SeedPrompt } from "./handoff/render.ts";

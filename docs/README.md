@@ -12,6 +12,7 @@ User documentation is written as features land: [user/README.md](user/README.md)
 | [Redaction](user/reference/redaction.md)                      | Credential-shaped text removed from session exports          |
 | [Codex session reader](user/reference/codex-reader.md)        | Turning a Codex rollout into a session export                |
 | [Claude Code session reader](user/reference/claude-reader.md) | Turning a Claude Code transcript into a session export       |
+| [Seed prompt](user/reference/seed-prompt.md)                  | The prompt that starts a moved session in the target agent   |
 
 ## Contributors
 
