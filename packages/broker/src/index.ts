@@ -30,3 +30,6 @@ export {
   SENSITIVE_FILE_PLACEHOLDER,
 } from "./redaction.ts";
 export type { RedactionFinding, RedactionKind, RedactionResult } from "./redaction.ts";
+
+export { CODEX_AGENT_ID, CodexReaderError, readCodexSession } from "./readers/codex.ts";
+export type { CodexReaderErrorCode, ReadCodexSessionOptions } from "./readers/codex.ts";

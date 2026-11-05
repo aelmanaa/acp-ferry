@@ -1,0 +1,10 @@
+{"timestamp":"2026-11-05T12:00:00.000Z","type":"session_meta","payload":{"id":"00000000-0000-4000-8000-000000000003","timestamp":"2026-11-05T12:00:00.000Z","cwd":"/workspace/codex-demo","cli_version":"0.162.1","source":"vscode","model_provider":"openai"}}
+{"timestamp":"2026-11-05T12:00:01.000Z","type":"turn_context","payload":{"turn_id":"turn-1","model":"gpt-fixture-1"}}
+{"timestamp":"2026-11-05T12:00:01.000Z","type":"response_item","payload":{"type":"message","role":"user","content":[{"type":"input_text","text":"Plan the release notes work."}]}}
+{"timestamp":"2026-11-05T12:00:02.000Z","type":"response_item","payload":{"type":"function_call","name":"update_plan","arguments":"{\"plan\":[{\"step\":\"Collect merged changes\",\"status\":\"in_progress\"},{\"step\":\"Draft the notes\",\"status\":\"pending\"}]}","call_id":"plan-1"}}
+{"timestamp":"2026-11-05T12:00:02.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"plan-1","output":"Plan updated"}}
+{"timestamp":"2026-11-05T12:00:03.000Z","type":"response_item","payload":{"type":"function_call","name":"update_plan","arguments":"{\"explanation\":\"First step done.\",\"plan\":[{\"step\":\"Collect merged changes\",\"status\":\"completed\"},{\"step\":\"Draft the notes\",\"status\":\"in_progress\"},{\"step\":\"Ask for review\",\"status\":\"pending\"}]}","call_id":"plan-2"}}
+{"timestamp":"2026-11-05T12:00:03.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"plan-2","output":"Plan updated"}}
+{"timestamp":"2026-11-05T12:00:04.000Z","type":"response_item","payload":{"type":"function_call","name":"update_plan","arguments":"not json","call_id":"plan-3"}}
+{"timestamp":"2026-11-05T12:00:04.000Z","type":"response_item","payload":{"type":"function_call_output","call_id":"plan-3","output":"failed to parse function arguments"}}
+{"timestamp":"2026-11-05T12:00:05.000Z","type":"response_item","payload":{"type":"message","role":"assistant","content":[{"type":"output_text","text":"The first step is done."}]}}
