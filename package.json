@@ -1,0 +1,47 @@
+{
+  "name": "acp-ferry-workspace",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "devEngines": {
+    "runtime": {
+      "name": "node",
+      "version": ">=22.18.0",
+      "onFail": "error"
+    }
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "clean": "pnpm -r run clean",
+    "typecheck": "tsc -b",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && node scripts/check-type-escapes.ts",
+    "test": "pnpm run build && pnpm -r run test",
+    "test:unit": "pnpm run build && pnpm -r run test:unit",
+    "coverage": "pnpm run build && pnpm -r run coverage",
+    "pkg:check": "pnpm run build && pnpm -r run pkg:check && knip",
+    "prepare": "lefthook install && node scripts/install-git-hooks.ts",
+    "changeset": "changeset",
+    "version-packages": "changeset version && pnpm install --lockfile-only --ignore-scripts"
+  },
+  "devDependencies": {
+    "@arethetypeswrong/cli": "catalog:",
+    "@changesets/changelog-github": "catalog:",
+    "@changesets/cli": "catalog:",
+    "@types/node": "catalog:",
+    "eslint-plugin-jsdoc": "catalog:",
+    "knip": "catalog:",
+    "lefthook": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "oxlint-tsgolint": "catalog:",
+    "publint": "catalog:",
+    "typescript": "catalog:"
+  }
+}

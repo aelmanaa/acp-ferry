@@ -1,0 +1,43 @@
+# Keep dependencies current (https://docs.github.com/code-security/dependabot).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    versioning-strategy: increase-if-necessary
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      tooling:
+        patterns:
+          [
+            "oxlint*",
+            "oxfmt",
+            "typescript",
+            "c8",
+            "knip",
+            "publint",
+            "@arethetypeswrong/*",
+            "lefthook",
+            "@changesets/*",
+            "eslint-plugin-jsdoc",
+            "@types/*",
+          ]
+    commit-message:
+      prefix: chore
+      include: scope
+    labels: ["dependencies", "type:chore", "priority:P2"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+    labels: ["dependencies", "type:chore", "priority:P2"]
+    groups:
+      actions:
+        patterns: ["*"]

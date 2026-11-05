@@ -1,0 +1,16 @@
+name: Question
+description: Ask about acp-ferry or the draft extension, or tell us whether you have the same need.
+labels: ["type:question", "status:needs-triage"]
+body:
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+    validations:
+      required: true
+  - type: input
+    id: context
+    attributes:
+      label: Context
+      description: The agents you use, and acp-ferry's version if you run it.
+      placeholder: Claude Code and Codex, acp-ferry 0.1.0

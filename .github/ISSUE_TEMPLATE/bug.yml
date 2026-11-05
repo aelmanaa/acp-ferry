@@ -1,0 +1,48 @@
+name: Bug report
+description: Something fails, behaves differently from the docs, or reports the wrong result.
+labels: ["type:bug", "status:needs-triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected, and what you got. Paste the result or error.
+    validations:
+      required: true
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      options:
+        [Claude Code, Codex, Gemini CLI, Goose, OpenCode, Another ACP agent, Not agent-specific]
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        [
+          Spec types,
+          Delegation,
+          Messaging,
+          Session export or import,
+          Routing,
+          Budgets or permissions,
+          Other,
+        ]
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: acp-ferry, Node.js, the agent and its ACP adapter.
+      placeholder: acp-ferry 0.1.0, Node.js 24.16.0, codex-acp 0.x
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: The smallest steps that show the problem. Never paste tokens, keys or private transcripts.

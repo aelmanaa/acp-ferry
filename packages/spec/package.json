@@ -1,0 +1,66 @@
+{
+  "name": "@acp-ferry/spec",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Draft types and pure helpers for an Agent Client Protocol (ACP) extension: cross-agent delegation, messaging, session portability and routing. Runs in any JavaScript runtime.",
+  "keywords": [
+    "agent-client-protocol",
+    "acp",
+    "coding-agents",
+    "llm",
+    "delegation",
+    "session-portability",
+    "interoperability",
+    "spec"
+  ],
+  "homepage": "https://github.com/aelmanaa/acp-ferry#readme",
+  "bugs": {
+    "url": "https://github.com/aelmanaa/acp-ferry/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aelmanaa/acp-ferry.git",
+    "directory": "packages/spec"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Amine El Manaa",
+    "url": "https://github.com/aelmanaa"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src/",
+    "src/",
+    "!**/*.test.*",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "clean": "node -e \"for (const p of ['dist','coverage']) require('node:fs').rmSync(p,{recursive:true,force:true})\"",
+    "test": "pnpm run test:unit",
+    "test:unit": "node ../../scripts/node-test.ts unit \"test/unit/**/*.test.ts\"",
+    "coverage": "c8 --check-coverage node --test \"test/unit/**/*.test.ts\"",
+    "pkg:check": "publint --strict && attw --pack . --profile esm-only"
+  },
+  "devDependencies": {
+    "c8": "catalog:"
+  }
+}

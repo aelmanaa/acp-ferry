@@ -1,0 +1,65 @@
+{
+  "name": "@acp-ferry/broker",
+  "version": "0.0.0",
+  "private": false,
+  "description": "Planned local broker that drives coding agents over the Agent Client Protocol (ACP) and serves calling agents over MCP. Placeholder; not implemented.",
+  "keywords": [
+    "agent-client-protocol",
+    "acp",
+    "mcp",
+    "coding-agents",
+    "llm",
+    "delegation",
+    "broker"
+  ],
+  "homepage": "https://github.com/aelmanaa/acp-ferry#readme",
+  "bugs": {
+    "url": "https://github.com/aelmanaa/acp-ferry/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aelmanaa/acp-ferry.git",
+    "directory": "packages/broker"
+  },
+  "license": "MIT",
+  "author": {
+    "name": "Amine El Manaa",
+    "url": "https://github.com/aelmanaa"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "types": "./dist/src/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/src/",
+    "src/",
+    "!**/*.test.*",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsc -b tsconfig.build.json",
+    "clean": "node -e \"for (const p of ['dist','coverage']) require('node:fs').rmSync(p,{recursive:true,force:true})\"",
+    "test": "pnpm run test:unit",
+    "test:unit": "node ../../scripts/node-test.ts unit \"test/unit/**/*.test.ts\"",
+    "coverage": "c8 --check-coverage node --test \"test/unit/**/*.test.ts\"",
+    "pkg:check": "publint --strict && attw --pack . --profile esm-only"
+  },
+  "devDependencies": {
+    "c8": "catalog:"
+  }
+}

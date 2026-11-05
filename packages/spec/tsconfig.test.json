@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "../../node_modules/.cache/tsbuild/spec-test",
+    "tsBuildInfoFile": "../../node_modules/.cache/tsbuild/spec-test.tsbuildinfo",
+    "lib": ["ES2023", "DOM"]
+  },
+  // Tests run on Node and import the sources directly. tsconfig.build.json checks src/ again
+  // without Node types, which keeps the shipped code runtime-neutral.
+  "include": ["src", "test"]
+}

@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install:*)",
+      "Bash(pnpm run check:*)",
+      "Bash(pnpm run lint:*)",
+      "Bash(pnpm run format:*)",
+      "Bash(pnpm run typecheck:*)",
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm run coverage:*)",
+      "Bash(pnpm run pkg:check:*)",
+      "Bash(pnpm test:*)",
+      "Bash(pnpm changeset:*)",
+      "Bash(node scripts/check-type-escapes.ts:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git worktree list:*)"
+    ],
+    "deny": ["Bash(npm publish:*)", "Bash(pnpm publish:*)", "Bash(git push origin main:*)"]
+  }
+}

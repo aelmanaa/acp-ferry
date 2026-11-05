@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.c8_output/
+*.tsbuildinfo
+*.tgz
+.env
+.env.*
+!.env.example
+.DS_Store
+
+# Local agent context (machine paths, working rules)
+CLAUDE.local.md

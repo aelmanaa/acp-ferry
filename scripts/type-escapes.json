@@ -1,0 +1,4 @@
+{
+  "$comment": "Every lint escape in shipped code (packages/*/src, except vendored code). scripts/check-type-escapes.ts fails on any escape not listed here, and on any entry that no longer matches. Add one only when no typed alternative exists, with the reason.",
+  "allowed": []
+}

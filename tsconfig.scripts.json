@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "node_modules/.cache/tsbuild/scripts",
+    "tsBuildInfoFile": "node_modules/.cache/tsbuild/scripts.tsbuildinfo"
+  },
+  "include": ["scripts"]
+}
