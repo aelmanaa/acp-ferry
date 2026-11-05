@@ -1,0 +1,188 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/aelmanaa/acp-ferry/raw/main/packages/spec/session-export.schema.json",
+  "title": "SessionExport",
+  "description": "DRAFT. A neutral, agent-independent copy of a coding agent session, version 0 (R-PORT-1). Limits: at most 10000 entries, 1000 plan items and 1000 losses; text at most 1000000 characters; names, paths, addresses, model ids and timestamps at most 4096 characters.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "source",
+    "exportedAt",
+    "handoff",
+    "workspace",
+    "plan",
+    "entries",
+    "losses"
+  ],
+  "properties": {
+    "format": {
+      "const": "acp-ferry/session-export"
+    },
+    "version": {
+      "const": 0
+    },
+    "source": {
+      "description": "Where the session came from.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address"],
+      "properties": {
+        "address": {
+          "description": "The session address, acp://<host>/<agent>/<session> (R-ID-3).",
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^acp://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?/[a-z0-9][a-z0-9._-]*/(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+$"
+        },
+        "model": {
+          "description": "The model, provider/model (R-ID-2).",
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9](?:[A-Za-z0-9._:@/+-]*[A-Za-z0-9._:@+-])?$"
+        }
+      }
+    },
+    "exportedAt": {
+      "description": "When the session was exported, as an RFC 3339 timestamp.",
+      "type": "string",
+      "maxLength": 4096,
+      "format": "date-time"
+    },
+    "handoff": {
+      "$ref": "#/$defs/HandoffMode"
+    },
+    "workspace": {
+      "$ref": "#/$defs/WorkspaceRef"
+    },
+    "plan": {
+      "description": "The open plan or todo list, one item per entry.",
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/Text"
+      }
+    },
+    "entries": {
+      "description": "The transcript, oldest first.",
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/TranscriptEntry"
+      }
+    },
+    "losses": {
+      "description": "What the export dropped and why (R-PORT-5).",
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "$ref": "#/$defs/Text"
+      }
+    }
+  },
+  "$defs": {
+    "Text": {
+      "type": "string",
+      "maxLength": 1000000
+    },
+    "Field": {
+      "type": "string",
+      "maxLength": 4096
+    },
+    "HandoffMode": {
+      "description": "How much history the handoff carries (R-PORT-3).",
+      "enum": ["summary+recent", "full-transcript"]
+    },
+    "WorkspaceRef": {
+      "description": "The workspace state that travels with the session (R-PORT-4).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cwd", "dirty"],
+      "properties": {
+        "cwd": {
+          "$ref": "#/$defs/Field"
+        },
+        "branch": {
+          "$ref": "#/$defs/Field"
+        },
+        "commit": {
+          "$ref": "#/$defs/Field"
+        },
+        "dirty": {
+          "type": "boolean"
+        }
+      }
+    },
+    "TranscriptEntry": {
+      "description": "One transcript entry. Tool calls travel as text (R-PORT-2).",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "text"],
+          "properties": {
+            "kind": {
+              "const": "user"
+            },
+            "text": {
+              "$ref": "#/$defs/Text"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "text"],
+          "properties": {
+            "kind": {
+              "const": "assistant"
+            },
+            "text": {
+              "$ref": "#/$defs/Text"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "tool", "input", "output", "status"],
+          "properties": {
+            "kind": {
+              "const": "tool-call"
+            },
+            "tool": {
+              "$ref": "#/$defs/Field"
+            },
+            "input": {
+              "$ref": "#/$defs/Text"
+            },
+            "output": {
+              "$ref": "#/$defs/Text"
+            },
+            "status": {
+              "enum": ["succeeded", "failed"]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "text", "replacedTurns"],
+          "properties": {
+            "kind": {
+              "const": "summary"
+            },
+            "text": {
+              "$ref": "#/$defs/Text"
+            },
+            "replacedTurns": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          }
+        }
+      ]
+    }
+  }
+}

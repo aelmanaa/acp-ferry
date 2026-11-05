@@ -35,12 +35,14 @@
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
     },
+    "./session-export.schema.json": "./session-export.schema.json",
     "./package.json": "./package.json"
   },
   "files": [
     "dist/src/",
     "src/",
     "!**/*.test.*",
+    "session-export.schema.json",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
@@ -61,6 +63,8 @@
     "pkg:check": "publint --strict && attw --pack . --profile esm-only"
   },
   "devDependencies": {
+    "ajv": "catalog:",
+    "ajv-formats": "catalog:",
     "c8": "catalog:"
   }
 }
