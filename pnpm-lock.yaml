@@ -250,6 +250,10 @@ importers:
         version: 7.0.2
 
   packages/broker:
+    dependencies:
+      '@acp-ferry/spec':
+        specifier: workspace:*
+        version: link:../spec
     devDependencies:
       c8:
         specifier: 'catalog:'

@@ -5,7 +5,8 @@ lets a coding agent discover, delegate to, message and hand sessions to another 
 machine, with a choice of model.
 
 Status: in design; nothing is published to npm yet. The repository has the toolchain, a typed draft
-contract (`packages/spec/src/types.ts`), identifier parsers, and the plan. No broker code exists yet.
+contract (`packages/spec/src/types.ts`), identifier parsers, the plan, and the first broker code:
+the workspace state reader for session exports.
 
 ## Start here
 
@@ -29,7 +30,10 @@ maintainer's.
 9. [docs/contributor/releasing.md](docs/contributor/releasing.md): release plan and first publish.
 
 User docs live in [docs/user/](docs/user/README.md); the index for people is
-[docs/README.md](docs/README.md).
+[docs/README.md](docs/README.md). Reference pages so far:
+
+- [docs/user/reference/workspace-state.md](docs/user/reference/workspace-state.md): `readWorkspace`,
+  its options and error codes, and `describeWorkspaceDrift`.
 
 ## Commands
 
@@ -50,7 +54,7 @@ natively. pnpm 12.16.1 (`packageManager`).
 | Path                    | Contents                                                                                                                     |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `packages/spec/src/`    | Draft types and identifier parsers. Runtime-neutral: no Node built-ins (lint rule and a build without Node types enforce it) |
-| `packages/broker/src/`  | The broker. Node-only. A placeholder today                                                                                   |
+| `packages/broker/src/`  | The broker. Node-only. Today: the workspace state reader (`workspace.ts`)                                                    |
 | `packages/*/test/unit/` | Unit tests, `*.test.ts`                                                                                                      |
 | `scripts/`              | Repository scripts run with plain `node`: git hooks, type-escape check, test runner                                          |
 | `docs/user/`            | User documentation (written as features land)                                                                                |

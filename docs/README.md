@@ -6,6 +6,10 @@ Audience: everyone. This is the index for people; agents start at [AGENTS.md](..
 
 User documentation is written as features land: [user/README.md](user/README.md).
 
+| Page                                                 | What it covers                                               |
+| ---------------------------------------------------- | ------------------------------------------------------------ |
+| [Workspace state](user/reference/workspace-state.md) | Directory, branch, commit and dirty state in session exports |
+
 ## Contributors
 
 | Page                                         | What it covers                                           |

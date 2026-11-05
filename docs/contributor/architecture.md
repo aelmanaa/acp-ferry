@@ -10,14 +10,14 @@ natively.
 
 ## Packages
 
-| Package             | Contents                                                                             | Runtime        | Status      |
-| ------------------- | ------------------------------------------------------------------------------------ | -------------- | ----------- |
-| `@acp-ferry/spec`   | Draft types (`types.ts`), identifier parsers (`identifiers.ts`). Later: JSON Schemas | Any JS runtime | Draft       |
-| `@acp-ferry/broker` | Broker core, ACP driver, MCP server, session export and import, routing              | Node           | Placeholder |
-| `@acp-ferry/cli`    | The `acp-ferry` command (R-DX-2)                                                     | Node           | Planned     |
+| Package             | Contents                                                                             | Runtime        | Status  |
+| ------------------- | ------------------------------------------------------------------------------------ | -------------- | ------- |
+| `@acp-ferry/spec`   | Draft types (`types.ts`), identifier parsers (`identifiers.ts`). Later: JSON Schemas | Any JS runtime | Draft   |
+| `@acp-ferry/broker` | Broker core, ACP driver, MCP server, session export and import, routing              | Node           | Started |
+| `@acp-ferry/cli`    | The `acp-ferry` command (R-DX-2)                                                     | Node           | Planned |
 
-`packages/broker` exists today with one exported constant, so the build, test, coverage and package
-checks run on both packages from the start. Whether the MCP server and the CLI become separate
+`packages/broker` has the workspace state reader (`workspace.ts`, R-PORT-4) and depends on
+`@acp-ferry/spec` for the types. Whether the MCP server and the CLI become separate
 packages is decided when M2 starts.
 
 ## Broker
