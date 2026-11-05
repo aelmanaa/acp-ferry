@@ -10,6 +10,8 @@ Pages so far:
   files it never exports.
 - [Codex session reader](reference/codex-reader.md): how a Codex rollout becomes a session export,
   and what the export drops.
+- [Claude Code session reader](reference/claude-reader.md): how a Claude Code transcript becomes a
+  session export, and what the export drops.
 
 Pages land with the features they describe, in four kinds (the Diátaxis layout):
 

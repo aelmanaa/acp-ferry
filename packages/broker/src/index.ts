@@ -33,3 +33,6 @@ export type { RedactionFinding, RedactionKind, RedactionResult } from "./redacti
 
 export { CODEX_AGENT_ID, CodexReaderError, readCodexSession } from "./readers/codex.ts";
 export type { CodexReaderErrorCode, ReadCodexSessionOptions } from "./readers/codex.ts";
+
+export { CLAUDE_AGENT_ID, ClaudeReaderError, readClaudeSession } from "./readers/claude.ts";
+export type { ClaudeReaderErrorCode, ReadClaudeSessionOptions } from "./readers/claude.ts";

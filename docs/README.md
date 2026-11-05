@@ -6,11 +6,12 @@ Audience: everyone. This is the index for people; agents start at [AGENTS.md](..
 
 User documentation is written as features land: [user/README.md](user/README.md).
 
-| Page                                                   | What it covers                                               |
-| ------------------------------------------------------ | ------------------------------------------------------------ |
-| [Workspace state](user/reference/workspace-state.md)   | Directory, branch, commit and dirty state in session exports |
-| [Redaction](user/reference/redaction.md)               | Credential-shaped text removed from session exports          |
-| [Codex session reader](user/reference/codex-reader.md) | Turning a Codex rollout into a session export                |
+| Page                                                          | What it covers                                               |
+| ------------------------------------------------------------- | ------------------------------------------------------------ |
+| [Workspace state](user/reference/workspace-state.md)          | Directory, branch, commit and dirty state in session exports |
+| [Redaction](user/reference/redaction.md)                      | Credential-shaped text removed from session exports          |
+| [Codex session reader](user/reference/codex-reader.md)        | Turning a Codex rollout into a session export                |
+| [Claude Code session reader](user/reference/claude-reader.md) | Turning a Claude Code transcript into a session export       |
 
 ## Contributors
 
