@@ -172,6 +172,22 @@ describe("renderSeedPrompt snapshots (R-PORT-3)", () => {
     assert.ok(seed.omitted.length > 0);
   });
 
+  it("renders cut tool text and redaction done while rendering", () => {
+    const doc = exportOf([...NO_SUMMARY.slice(0, 6), user(`deploy with ${FAKE.github()}`)]);
+    const seed = renderSeedPrompt(doc, {
+      handoffId: "h-0007",
+      mode: "full-transcript",
+      maxToolTextCharacters: 20,
+    });
+    matchSnapshot("full-transcript-cut-redacted", seed.text);
+    assert.deepEqual(seed.omitted, [
+      "entry 2 tool input (cut 6 of 26 characters)",
+      "entry 2 tool output (cut 45 of 65 characters)",
+      "entry 5 tool input (cut 2 of 22 characters)",
+      "redacted 1 credential-shaped string (github-token) while rendering",
+    ]);
+  });
+
   it("gives the same text for the same input", () => {
     const doc = exportOf(SESSION);
     const first = renderSeedPrompt(doc, { handoffId: "h-0005" });
@@ -355,6 +371,7 @@ describe("renderSeedPrompt budget", () => {
       handoffId: "h-p",
       mode: "full-transcript",
       maxCharacters: 3_400,
+      maxToolTextCharacters: 10_000,
     });
     assert.deepEqual(seed.omitted, ["turn 1 (entries 1 to 2)", "entry 4 (tool call)"]);
     assert.match(seed.text, /<acp-ferry-user n="3">\nthe last prompt\n/);
@@ -370,7 +387,12 @@ describe("renderSeedPrompt budget", () => {
       "turn 1 (entries 1 to 2)",
       "entry 4 (tool call)",
       "entry 5 (assistant reply)",
+      "over the 1-character limit, because the last user prompt, the plan and the losses are never left out",
     ]);
+    assert.match(
+      tiny.text,
+      /^The text is over the 1-character limit, because the last user prompt/m,
+    );
     assert.match(tiny.text, /the last prompt/);
     assert.match(tiny.text, /- Add a regression test/);
   });
@@ -386,7 +408,7 @@ describe("renderSeedPrompt budget", () => {
     assert.deepEqual(seed.omitted, ["summary at entry 1 (replaced 3 turns)"]);
     assert.match(seed.text, /<acp-ferry-digest>\n- turn 1: a\n- turn 2: b\n<\/acp-ferry-digest>\n/);
     const less = renderSeedPrompt(doc, { handoffId: "h-s", recentTurns: 1, maxCharacters: 1 });
-    assert.equal(less.omitted.length, 3);
+    assert.equal(less.omitted.length, 4);
     assert.doesNotMatch(less.text, /acp-ferry-digest/);
   });
 
@@ -488,7 +510,11 @@ describe("renderSeedPrompt edge cases", () => {
       mode: "full-transcript",
       maxCharacters: 1,
     });
-    assert.deepEqual(seed.omitted, ["entry 1 (assistant reply)", "entry 2 (assistant reply)"]);
+    assert.deepEqual(seed.omitted, [
+      "entry 1 (assistant reply)",
+      "entry 2 (assistant reply)",
+      "over the 1-character limit, because the last user prompt, the plan and the losses are never left out",
+    ]);
     const full = renderSeedPrompt(exportOf([assistant(""), assistant("b\n"), user("u")]), {
       handoffId: "h-n",
       mode: "full-transcript",
@@ -502,13 +528,19 @@ describe("renderSeedPrompt edge cases", () => {
       mode: "full-transcript",
       maxCharacters: 1,
     });
-    assert.deepEqual(lead.omitted, ["entry 1 before turn 1"]);
+    assert.deepEqual(lead.omitted, [
+      "entry 1 before turn 1",
+      "over the 1-character limit, because the last user prompt, the plan and the losses are never left out",
+    ]);
     const leads = renderSeedPrompt(exportOf([assistant("x"), assistant("y"), user("u")]), {
       handoffId: "h-n",
       mode: "full-transcript",
       maxCharacters: 1,
     });
-    assert.deepEqual(leads.omitted, ["entries 1 to 2 before turn 1"]);
+    assert.deepEqual(leads.omitted, [
+      "entries 1 to 2 before turn 1",
+      "over the 1-character limit, because the last user prompt, the plan and the losses are never left out",
+    ]);
   });
 
   it("uses the export's handoff mode unless the option sets one", () => {
@@ -533,6 +565,10 @@ describe("renderSeedPrompt edge cases", () => {
       assert.throws(() => renderSeedPrompt(doc, { handoffId: "h", maxCharacters: value }), {
         name: "RangeError",
         message: /^maxCharacters must be a positive integer/,
+      });
+      assert.throws(() => renderSeedPrompt(doc, { handoffId: "h", maxToolTextCharacters: value }), {
+        name: "RangeError",
+        message: /^maxToolTextCharacters must be a positive integer/,
       });
     }
   });
@@ -575,5 +611,133 @@ describe("handoff marker", () => {
     });
     assert.deepEqual(parseHandoffMarker(second.text), { ok: true, value: "second" });
     assert.equal(second.text.split("\n").filter((l) => l === "</acp-ferry-history>").length, 1);
+  });
+});
+
+describe("renderSeedPrompt tool text cuts", () => {
+  const input = `${"i".repeat(3_000)}MIDDLE-IN${"j".repeat(3_000)}`;
+  const output = `HEAD${"o".repeat(9_992)}TAIL`;
+  const doc = exportOf([
+    user("u".repeat(6_000)),
+    tool("Bash", input, output, "failed"),
+    assistant("a".repeat(6_000)),
+    user("next"),
+  ]);
+
+  for (const mode of ["full-transcript", "summary+recent"] as const) {
+    it(`cuts long tool inputs and outputs in the middle and lists each cut (${mode})`, () => {
+      const seed = renderSeedPrompt(doc, { handoffId: "h-t", mode, maxCharacters: 1_000_000 });
+      assert.deepEqual(seed.omitted, [
+        "entry 2 tool input (cut 2009 of 6009 characters)",
+        "entry 2 tool output (cut 6000 of 10000 characters)",
+      ]);
+      assert.match(
+        seed.text,
+        /<acp-ferry-input>\ni{2000}\n\[… 2009 characters cut …\]\nj{2000}\n<\/acp-ferry-input>/,
+      );
+      assert.match(
+        seed.text,
+        /<acp-ferry-output>\nHEADo{1996}\n\[… 6000 characters cut …\]\no{1996}TAIL\n<\/acp-ferry-output>/,
+      );
+      assert.doesNotMatch(seed.text, /MIDDLE-IN/);
+      assert.match(
+        seed.text,
+        /^Cut in the middle to 4000 characters: entry 2 tool input \(cut 2009/m,
+      );
+      assert.ok(seed.text.includes(`\n${"u".repeat(6_000)}\n`));
+      assert.ok(seed.text.includes(`\n${"a".repeat(6_000)}\n`));
+    });
+  }
+
+  it("takes the limit as an option and counts code points", () => {
+    const emoji = renderSeedPrompt(
+      exportOf([user("x"), tool("Read", "😀".repeat(10), "😀".repeat(3))]),
+      {
+        handoffId: "h-t",
+        maxToolTextCharacters: 4,
+      },
+    );
+    assert.match(emoji.text, /<acp-ferry-input>\n😀😀\n\[… 6 characters cut …\]\n😀😀\n/);
+    assert.deepEqual(emoji.omitted, ["entry 2 tool input (cut 6 of 10 characters)"]);
+    const odd = renderSeedPrompt(exportOf([user("x"), tool("Read", "abcdefg", "")]), {
+      handoffId: "h-t",
+      maxToolTextCharacters: 3,
+    });
+    assert.match(odd.text, /\nab\n\[… 4 characters cut …\]\ng\n/);
+  });
+
+  it("names many cuts briefly in the text and all of them in omitted", () => {
+    const calls = Array.from({ length: 8 }, () => tool("Read", "x".repeat(20), "ok"));
+    const seed = renderSeedPrompt(exportOf([user("go"), ...calls]), {
+      handoffId: "h-t",
+      maxToolTextCharacters: 10,
+    });
+    assert.equal(seed.omitted.length, 8);
+    assert.match(
+      seed.text,
+      /^Cut in the middle to 10 characters: entry 2 tool input \(cut 10 of 20 characters\); entry 3 [^;]+; entry 4 [^;]+; entry 5 [^;]+; 3 more; entry 9 tool input \(cut 10 of 20 characters\)\.$/m,
+    );
+  });
+
+  it("counts only the cuts of the parts the budget keeps", () => {
+    const seed = renderSeedPrompt(
+      exportOf([user("old"), tool("Read", "x".repeat(5_000), ""), user("new"), assistant("ok")]),
+      { handoffId: "h-t", mode: "full-transcript", maxCharacters: 3_000 },
+    );
+    assert.deepEqual(seed.omitted, ["turn 1 (entries 1 to 2)"]);
+    assert.doesNotMatch(seed.text, /Cut in the middle/);
+  });
+});
+
+describe("renderSeedPrompt redacts again (R-SEC-4)", () => {
+  it("redacts a fake token planted in a hand-made export and reports it", () => {
+    const github = FAKE.github();
+    const npm = FAKE.npm();
+    const doc = exportOf(
+      [
+        user(`push with ${github}`),
+        tool(`Bash ${npm}`, `${"x".repeat(1_990)} ${github} ${"y".repeat(2_500)}`, `token ${npm}`),
+        assistant("done"),
+        user("again"),
+      ],
+      {
+        plan: [`rotate ${github}`],
+        workspace: { cwd: `/w/${npm}`, dirty: false },
+        losses: [],
+      },
+    );
+    for (const mode of ["full-transcript", "summary+recent"] as const) {
+      const seed = renderSeedPrompt(doc, { handoffId: "h-x", mode, recentTurns: 1 });
+      assert.ok(!seed.text.includes(github), mode);
+      assert.ok(!seed.text.includes(npm), mode);
+      assert.ok(!seed.text.includes("FAKE"), mode);
+      assert.match(seed.text, /\[redacted:github-token\]/);
+      const line = seed.omitted.at(-1) ?? "";
+      assert.match(
+        line,
+        /^redacted \d+ credential-shaped strings \((github-token, npm-token|npm-token, github-token)\) while rendering$/,
+      );
+      assert.match(
+        seed.text,
+        new RegExp(`^Also ${line.replaceAll("(", "\\(").replaceAll(")", "\\)")}\\.$`, "m"),
+      );
+    }
+  });
+
+  it("redacts before cutting, so a token across the cut point never leaks a part", () => {
+    const github = FAKE.github();
+    const doc = exportOf([
+      user("x"),
+      tool("Bash", `${"a".repeat(1_985)} ${github} ${"b".repeat(2_000)}`, ""),
+    ]);
+    const seed = renderSeedPrompt(doc, { handoffId: "h-x" });
+    assert.ok(!seed.text.includes(github.slice(0, 8)));
+    assert.ok(!seed.text.includes(github.slice(-8)));
+  });
+
+  it("adds no line when the export was already redacted", () => {
+    const seed = renderSeedPrompt(exportOf(SESSION), { handoffId: "h-x" });
+    assert.ok(!seed.omitted.some((item) => item.includes("while rendering")));
+    assert.doesNotMatch(seed.text, /while rendering/);
   });
 });

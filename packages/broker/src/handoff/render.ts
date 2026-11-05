@@ -8,9 +8,13 @@
  *
  * The transcript is untrusted. Every piece of it sits inside an `<acp-ferry-…>` block, and text that
  * could close a block or fake the handoff marker gets a backslash, so it stays inside its block.
+ * Every piece of text also goes through `redact` again, in case the export was not redacted.
  */
 import { parseSessionAddress } from "@acp-ferry/spec";
 import type { HandoffMode, ParseResult, SessionExport, TranscriptEntry } from "@acp-ferry/spec";
+
+import { mergeRedactionFindings, redact, redactionLosses } from "../redaction.ts";
+import type { RedactionFinding } from "../redaction.ts";
 
 /**
  * Default limits of {@link renderSeedPrompt} (decision 4 on the M1 epic).
@@ -19,6 +23,7 @@ import type { HandoffMode, ParseResult, SessionExport, TranscriptEntry } from "@
  * ```ts
  * SEED_PROMPT_DEFAULTS.recentTurns; // 10
  * SEED_PROMPT_DEFAULTS.maxCharacters; // 24000, summary+recent only
+ * SEED_PROMPT_DEFAULTS.maxToolTextCharacters; // 4000, each tool input and output
  * ```
  * @experimental
  */
@@ -27,6 +32,8 @@ export const SEED_PROMPT_DEFAULTS = {
   recentTurns: 10,
   /** The character budget of a `summary+recent` seed prompt, in Unicode code points. */
   maxCharacters: 24_000,
+  /** The longest tool input or output kept whole, in Unicode code points. Both modes. */
+  maxToolTextCharacters: 4_000,
 } as const;
 
 /**
@@ -55,6 +62,13 @@ export interface RenderSeedPromptOptions {
    * `full-transcript`.
    */
   readonly maxCharacters?: number;
+  /**
+   * The most characters (Unicode code points) kept of each tool input and each tool output, in both
+   * modes. A longer one keeps its first and last characters, this many in total, around a
+   * `[… N characters cut …]` line. Defaults to {@link SEED_PROMPT_DEFAULTS}.`maxToolTextCharacters`.
+   * User and assistant text is never cut.
+   */
+  readonly maxToolTextCharacters?: number;
 }
 
 /**
@@ -68,8 +82,11 @@ export interface SeedPrompt {
   /** The marker line, `acp-ferry handoff <id>`, without a line break. */
   readonly marker: string;
   /**
-   * What the character budget left out, oldest first, for example `turn 3 (entries 7 to 12)`. The
-   * text names the same parts. Empty when everything fits.
+   * What the text leaves out or changes, in this order: the parts the character budget left out,
+   * oldest first (`turn 3 (entries 7 to 12)`); the tool inputs and outputs cut in the middle
+   * (`entry 5 tool output (cut 8000 of 12000 characters)`); a line for credential-shaped text that
+   * rendering redacted and the export had not; and a note when the text is still over the budget.
+   * The text names the same items. Empty when nothing was left out or changed.
    */
   readonly omitted: readonly string[];
 }
@@ -156,16 +173,19 @@ export function parseHandoffMarker(text: string): ParseResult<string> {
  *   summary covers, a digest with one line per turn (the prompt shortened, the tool call count and
  *   the files named in tool inputs). Then the last `recentTurns` user turns verbatim.
  *
- * When the text is longer than `maxCharacters`, the oldest parts of the history are left out first
- * and listed in `omitted` and in the text. The plan, the losses and the last user prompt are never
- * left out, so the text can still be longer than the budget when they alone are.
+ * In both modes, each tool input and output longer than `maxToolTextCharacters` is cut in the
+ * middle. When the text is longer than `maxCharacters`, the oldest parts of the history are left out
+ * first. The plan, the losses and the last user prompt are never left out or cut, so the text can
+ * still be longer than the budget when they alone are; `omitted` then says so.
  *
- * Text that redaction replaced stays replaced: the renderer only copies the export's text.
+ * Every piece of text goes through `redact` before it is cut or quoted. Text the export already
+ * redacted stays as it is, and anything new that redaction finds is counted in `omitted`.
  *
  * @param doc - The export. Pass one that `parseSessionExport` accepted.
  * @param options - The handoff id, and optionally the mode and limits.
- * @returns The text, the marker line and what the budget left out.
- * @throws RangeError when `handoffId`, `recentTurns` or `maxCharacters` is invalid.
+ * @returns The text, the marker line and what the text leaves out or changes.
+ * @throws RangeError when `handoffId`, `recentTurns`, `maxCharacters` or `maxToolTextCharacters`
+ *   is invalid.
  * @example
  * ```ts
  * import { parseSessionExport } from "@acp-ferry/spec";
@@ -188,30 +208,62 @@ export function renderSeedPrompt(doc: SessionExport, options: RenderSeedPromptOp
   const budget =
     positiveInteger("maxCharacters", options.maxCharacters) ??
     (mode === "summary+recent" ? SEED_PROMPT_DEFAULTS.maxCharacters : undefined);
+  const toolMax =
+    positiveInteger("maxToolTextCharacters", options.maxToolTextCharacters) ??
+    SEED_PROMPT_DEFAULTS.maxToolTextCharacters;
 
-  const pieces = historyPieces(doc.entries, mode, recentTurns);
-  const droppable = pieces.filter((piece) => piece.label !== undefined);
-  const labels = droppable.map((piece) => piece.label ?? "");
-  const top = headerTop(doc, marker, mode, recentTurns);
-  const bottom = `${headerBottom(doc)}<acp-ferry-history handoff="${options.handoffId}">\n`;
+  const header = new Sink();
+  const top = headerTop(doc, marker, mode, recentTurns, header);
+  const bottom = `${headerBottom(doc, header)}<acp-ferry-history handoff="${options.handoffId}">\n`;
   const end = `</acp-ferry-history>\n\n${CLOSING}`;
+  const pieces = historyPieces(doc.entries, mode, recentTurns, toolMax);
+  const labels = pieces.flatMap((piece) => (piece.label === undefined ? [] : [piece.label]));
+  const fixed = codePoints(top) + codePoints(bottom) + codePoints(end);
 
-  const dropped = budget === undefined ? 0 : fit(pieces, labels, budget, top, bottom, end);
-  const omitted = labels.slice(0, dropped);
+  const dropped =
+    budget === undefined ? 0 : fit(pieces, labels, header.findings, budget, toolMax, fixed);
   const kept = pieces.filter((piece) => piece.order === undefined || piece.order >= dropped);
-  const history: string[] = [];
-  // Digest lines are always followed by the last user prompt, which is never left out, so the
-  // loop always closes the digest block.
-  let inDigest = false;
-  for (const piece of kept) {
-    if (piece.digest !== inDigest) {
-      history.push(piece.digest ? DIGEST_OPEN : DIGEST_CLOSE);
-      inDigest = piece.digest;
-    }
-    history.push(piece.text);
+  let noted = notesFor(labels, dropped, kept, header.findings, budget, toolMax, false);
+  const history = historyText(kept);
+  let text = `${top}${noted.text}${bottom}${history}${end}`;
+  if (budget !== undefined && codePoints(text) > budget) {
+    noted = notesFor(labels, dropped, kept, header.findings, budget, toolMax, true);
+    text = `${top}${noted.text}${bottom}${history}${end}`;
   }
-  const text = `${top}${omissionLine(labels, dropped, budget)}${bottom}${history.join("")}${end}`;
-  return { text, marker, omitted };
+  return { text, marker, omitted: noted.omitted };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Redaction and cuts
+// ---------------------------------------------------------------------------------------------
+
+/** Collects what rendering redacted and cut while it builds one part of the text. */
+class Sink {
+  readonly findings: RedactionFinding[] = [];
+  readonly cuts: string[] = [];
+
+  /** Redacts `text` and records what it found. */
+  clean(text: string): string {
+    const result = redact(text);
+    this.findings.push(...result.findings);
+    return result.text;
+  }
+}
+
+/** Keeps the first and last characters of `text`, `max` code points in all, around a cut line. */
+function cutMiddle(text: string, max: number): { readonly text: string; readonly cut: number } {
+  const length = codePoints(text);
+  if (length <= max) {
+    return { text, cut: 0 };
+  }
+  const characters = Array.from(text);
+  const head = Math.ceil(max / 2);
+  const tail = max - head;
+  const cut = length - max;
+  return {
+    text: `${characters.slice(0, head).join("")}\n[… ${cut} characters cut …]\n${characters.slice(length - tail).join("")}`,
+    cut,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -228,6 +280,10 @@ interface Piece {
   readonly order: number | undefined;
   /** Whether it is a digest line, inside the digest block. */
   readonly digest: boolean;
+  /** What rendering redacted in it. */
+  readonly findings: readonly RedactionFinding[];
+  /** The tool inputs and outputs cut in it, as `omitted` names them. */
+  readonly cuts: readonly string[];
 }
 
 /** A user turn: the user entry and the entries up to the next one. Turn 0 is what comes first. */
@@ -244,6 +300,7 @@ function historyPieces(
   entries: readonly TranscriptEntry[],
   mode: HandoffMode,
   recentTurns: number,
+  toolMax: number,
 ): readonly Piece[] {
   const turns = splitTurns(entries);
   const last = turns.at(-1);
@@ -252,11 +309,23 @@ function historyPieces(
   }
   const pieces: Piece[] = [];
   let droppable = 0;
-  const add = (text: string, label: string | undefined, digest = false): void => {
+  const add = (render: (sink: Sink) => string, label: string | undefined, digest = false): void => {
+    const sink = new Sink();
+    const text = render(sink);
     const order = label === undefined ? undefined : droppable;
     droppable += label === undefined ? 0 : 1;
-    pieces.push({ text, length: codePoints(text), label, order, digest });
+    pieces.push({
+      text,
+      length: codePoints(text),
+      label,
+      order,
+      digest,
+      findings: sink.findings,
+      cuts: sink.cuts,
+    });
   };
+  const entry = (item: TranscriptEntry, index: number) => (sink: Sink) =>
+    renderEntry(item, index + 1, toolMax, sink);
 
   const userTurns = turns.filter((turn) => turn.number > 0).length;
   const verbatimFrom =
@@ -264,12 +333,12 @@ function historyPieces(
   const earlier = turns.slice(0, verbatimFrom);
   const boundary = turns[verbatimFrom]?.start ?? 0;
   let lastSummary = -1;
-  entries.slice(0, boundary).forEach((entry, index) => {
-    if (entry.kind === "summary") {
+  entries.slice(0, boundary).forEach((item, index) => {
+    if (item.kind === "summary") {
       lastSummary = index;
       add(
-        renderEntry(entry, index + 1),
-        `summary at entry ${index + 1} (replaced ${entry.replacedTurns} turns)`,
+        entry(item, index),
+        `summary at entry ${index + 1} (replaced ${item.replacedTurns} turns)`,
       );
     }
   });
@@ -277,7 +346,7 @@ function historyPieces(
     const start = Math.max(turn.start, lastSummary + 1);
     if (start < turn.end) {
       add(
-        digestLine(turn, entries.slice(start, turn.end), start === turn.start),
+        (sink) => digestLine(turn, entries.slice(start, turn.end), start === turn.start, sink),
         `digest line for ${turnName(turn)}`,
         true,
       );
@@ -285,14 +354,36 @@ function historyPieces(
   }
 
   for (const turn of turns.slice(verbatimFrom, -1)) {
-    add(renderRange(entries, turn.start, turn.end), turnLabel(turn));
+    add(
+      (sink) =>
+        entries
+          .slice(turn.start, turn.end)
+          .map((item, offset) => renderEntry(item, turn.start + offset + 1, toolMax, sink))
+          .join(""),
+      turnLabel(turn),
+    );
   }
-  entries.slice(last.start, last.end).forEach((entry, offset) => {
+  entries.slice(last.start, last.end).forEach((item, offset) => {
     const n = last.start + offset + 1;
-    const pinned = offset === 0 && entry.kind === "user";
-    add(renderEntry(entry, n), pinned ? undefined : `entry ${n} (${KIND_NAMES[entry.kind]})`);
+    const pinned = offset === 0 && item.kind === "user";
+    add(entry(item, n - 1), pinned ? undefined : `entry ${n} (${KIND_NAMES[item.kind]})`);
   });
   return pieces;
+}
+
+function historyText(kept: readonly Piece[]): string {
+  const history: string[] = [];
+  // Digest lines are always followed by the last user prompt, which is never left out, so the
+  // loop always closes the digest block.
+  let inDigest = false;
+  for (const piece of kept) {
+    if (piece.digest !== inDigest) {
+      history.push(piece.digest ? DIGEST_OPEN : DIGEST_CLOSE);
+      inDigest = piece.digest;
+    }
+    history.push(piece.text);
+  }
+  return history.join("");
 }
 
 const KIND_NAMES: Readonly<Record<TranscriptEntry["kind"], string>> = {
@@ -332,46 +423,57 @@ function turnLabel(turn: Turn): string {
   return turn.number === 0 ? `${range} before turn 1` : `turn ${turn.number} (${range})`;
 }
 
-function renderRange(entries: readonly TranscriptEntry[], start: number, end: number): string {
-  return entries
-    .slice(start, end)
-    .map((entry, offset) => renderEntry(entry, start + offset + 1))
-    .join("");
-}
-
-function renderEntry(entry: TranscriptEntry, n: number): string {
+function renderEntry(entry: TranscriptEntry, n: number, toolMax: number, sink: Sink): string {
   if (entry.kind === "tool-call") {
+    const toolText = (part: "input" | "output", text: string): string => {
+      const { text: kept, cut } = cutMiddle(sink.clean(text), toolMax);
+      if (cut > 0) {
+        sink.cuts.push(`entry ${n} tool ${part} (cut ${cut} of ${cut + toolMax} characters)`);
+      }
+      return block(`<acp-ferry-${part}>`, kept, `</acp-ferry-${part}>`);
+    };
     return [
       `<acp-ferry-tool-call n="${n}" status="${entry.status}">\n`,
-      `tool: ${quote(entry.tool)}\n`,
-      block("<acp-ferry-input>", entry.input, "</acp-ferry-input>"),
-      block("<acp-ferry-output>", entry.output, "</acp-ferry-output>"),
+      `tool: ${quote(entry.tool, sink)}\n`,
+      toolText("input", entry.input),
+      toolText("output", entry.output),
       "</acp-ferry-tool-call>\n",
     ].join("");
   }
+  const text = sink.clean(entry.text);
   if (entry.kind === "summary") {
     return block(
       `<acp-ferry-summary n="${n}" replaced-turns="${entry.replacedTurns}">`,
-      entry.text,
+      text,
       "</acp-ferry-summary>",
     );
   }
-  return block(`<acp-ferry-${entry.kind} n="${n}">`, entry.text, `</acp-ferry-${entry.kind}>`);
+  return block(`<acp-ferry-${entry.kind} n="${n}">`, text, `</acp-ferry-${entry.kind}>`);
 }
 
+/** A tagged block of redacted text; the text is escaped so it cannot close the block. */
 function block(open: string, text: string, close: string): string {
   const body = escapeRecord(text);
   const ended = body === "" || body.endsWith("\n") ? body : `${body}\n`;
   return `${open}\n${ended}${close}\n`;
 }
 
-function digestLine(turn: Turn, entries: readonly TranscriptEntry[], hasPrompt: boolean): string {
+function digestLine(
+  turn: Turn,
+  entries: readonly TranscriptEntry[],
+  hasPrompt: boolean,
+  sink: Sink,
+): string {
   const [first] = entries;
   const prompt =
-    hasPrompt && first?.kind === "user" ? shorten(first.text, DIGEST_PROMPT_LENGTH) : "(no prompt)";
+    hasPrompt && first?.kind === "user"
+      ? shorten(sink.clean(first.text), DIGEST_PROMPT_LENGTH)
+      : "(no prompt)";
   const calls = entries.filter((entry) => entry.kind === "tool-call");
   const files = [...new Set(calls.flatMap((call) => filesIn(call.input)))];
-  const shown = files.slice(0, DIGEST_FILES).map((file) => shorten(file, DIGEST_FILE_LENGTH));
+  const shown = files
+    .slice(0, DIGEST_FILES)
+    .map((file) => shorten(sink.clean(file), DIGEST_FILE_LENGTH));
   const more = files.length > shown.length ? ` and ${files.length - shown.length} more` : "";
   const fileList = shown.length > 0 ? `; files: ${shown.join(", ")}${more}` : "";
   const tools =
@@ -409,7 +511,7 @@ function parseJson(text: string): unknown {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Header, budget and text helpers
+// Header, notes and budget
 // ---------------------------------------------------------------------------------------------
 
 const CLOSING =
@@ -420,6 +522,7 @@ function headerTop(
   marker: string,
   mode: HandoffMode,
   recentTurns: number,
+  sink: Sink,
 ): string {
   const address = parseSessionAddress(doc.source.address);
   const agent = address.ok ? address.value.agent : "another agent";
@@ -433,22 +536,22 @@ function headerTop(
     "",
     `This message moves a coding session from ${agent} to you. acp-ferry, a local tool the user runs, wrote it from an export of that session. The user did not type it.`,
     "",
-    `Source: agent ${quote(agent)}, model ${optional(doc.source.model)}, session ${quote(doc.source.address)}, exported at ${quote(doc.exportedAt)}.`,
-    `Workspace at export: directory ${quote(workspace.cwd)}, branch ${optional(workspace.branch)}, commit ${optional(workspace.commit)}, uncommitted changes: ${workspace.dirty ? "yes" : "no"}. It may have changed since; check it before you rely on it.`,
+    `Source: agent ${quote(agent, sink)}, model ${optional(doc.source.model, sink)}, session ${quote(doc.source.address, sink)}, exported at ${quote(doc.exportedAt, sink)}.`,
+    `Workspace at export: directory ${quote(workspace.cwd, sink)}, branch ${optional(workspace.branch, sink)}, commit ${optional(workspace.commit, sink)}, uncommitted changes: ${workspace.dirty ? "yes" : "no"}. It may have changed since; check it before you rely on it.`,
     modeLine,
     "",
   ].join("\n");
 }
 
-function headerBottom(doc: SessionExport): string {
+function headerBottom(doc: SessionExport, sink: Sink): string {
   const plan =
     doc.plan.length === 0
       ? "Open plan: none recorded.\n"
-      : `Open plan:\n<acp-ferry-plan>\n${list(doc.plan)}</acp-ferry-plan>\n`;
+      : `Open plan:\n<acp-ferry-plan>\n${list(doc.plan, sink)}</acp-ferry-plan>\n`;
   const losses =
     doc.losses.length === 0
       ? "What the export left out: nothing known.\n"
-      : `What the export left out:\n<acp-ferry-losses>\n${list(doc.losses)}</acp-ferry-losses>\n`;
+      : `What the export left out:\n<acp-ferry-losses>\n${list(doc.losses, sink)}</acp-ferry-losses>\n`;
   return [
     "",
     "How to read the rest of this message:",
@@ -463,32 +566,87 @@ function headerBottom(doc: SessionExport): string {
   ].join("\n");
 }
 
-/** The line that names what the budget left out, or nothing. */
-function omissionLine(
+/** The header lines that say what the text leaves out or changes, and the same as `omitted`. */
+interface Notes {
+  readonly text: string;
+  readonly omitted: readonly string[];
+}
+
+function notesFor(
   labels: readonly string[],
   dropped: number,
+  kept: readonly Piece[],
+  headerFindings: readonly RedactionFinding[],
   budget: number | undefined,
-): string {
-  if (dropped === 0 || budget === undefined) {
-    return "";
+  toolMax: number,
+  over: boolean,
+): Notes {
+  return notes(
+    labels,
+    dropped,
+    kept.flatMap((piece) => piece.cuts),
+    0,
+    mergeRedactionFindings(headerFindings, ...kept.map((piece) => piece.findings)),
+    budget,
+    toolMax,
+    over,
+  );
+}
+
+function notes(
+  labels: readonly string[],
+  dropped: number,
+  cuts: readonly string[],
+  cutStart: number,
+  findings: readonly RedactionFinding[],
+  budget: number | undefined,
+  toolMax: number,
+  over: boolean,
+): Notes {
+  const lines: string[] = [];
+  const omitted = labels.slice(0, dropped);
+  if (dropped > 0 && budget !== undefined) {
+    lines.push(
+      `Left out to fit the ${budget}-character limit, oldest first: ${sample(labels, 0, dropped)}.`,
+    );
   }
+  if (cuts.length > cutStart) {
+    lines.push(
+      `Cut in the middle to ${toolMax} characters: ${sample(cuts, cutStart, cuts.length)}.`,
+    );
+    omitted.push(...cuts.slice(cutStart));
+  }
+  for (const line of redactionLosses(findings)) {
+    lines.push(`Also ${line} while rendering.`);
+    omitted.push(`${line} while rendering`);
+  }
+  if (over && budget !== undefined) {
+    const note = `over the ${budget}-character limit, because the last user prompt, the plan and the losses are never left out`;
+    lines.push(`The text is ${note}.`);
+    omitted.push(note);
+  }
+  return { text: lines.map((line) => `${line}\n`).join(""), omitted };
+}
+
+/** Names items `from` to `to`, or the first four, a count and the last when there are many. */
+function sample(items: readonly string[], from: number, to: number): string {
+  const count = to - from;
   const named =
-    dropped <= 6
-      ? labels.slice(0, dropped)
-      : [...labels.slice(0, 4), `${dropped - 5} more`, labels[dropped - 1] ?? ""];
-  return `Left out to fit the ${budget}-character limit, oldest first: ${named.join("; ")}.\n`;
+    count <= 6
+      ? items.slice(from, to)
+      : [...items.slice(from, from + 4), `${count - 5} more`, items[to - 1] ?? ""];
+  return named.join("; ");
 }
 
 /** How many droppable pieces, oldest first, to leave out so the text fits the budget. */
 function fit(
   pieces: readonly Piece[],
   labels: readonly string[],
+  headerFindings: readonly RedactionFinding[],
   budget: number,
-  top: string,
-  bottom: string,
-  end: string,
+  toolMax: number,
+  fixed: number,
 ): number {
-  const fixed = codePoints(top) + codePoints(bottom) + codePoints(end);
   const digestOrders = pieces.flatMap((piece) =>
     piece.digest && piece.order !== undefined ? [piece.order] : [],
   );
@@ -503,28 +661,51 @@ function fit(
   for (let k = labels.length - 1; k >= 0; k -= 1) {
     kept[k] = (kept[k] ?? 0) + (kept[k + 1] ?? 0);
   }
+  // Cuts and findings of the pieces still in, updated as the oldest pieces go.
+  const cuts = pieces.flatMap((piece) => piece.cuts);
+  const counts = new Map<RedactionFinding["kind"], number>();
+  const count = (findings: readonly RedactionFinding[], sign: number): void => {
+    for (const { kind, count: n } of findings) {
+      counts.set(kind, (counts.get(kind) ?? 0) + sign * n);
+    }
+  };
+  count(headerFindings, 1);
+  for (const piece of pieces) {
+    count(piece.findings, 1);
+  }
+  const droppable = pieces.filter((piece) => piece.order !== undefined);
+  let cutStart = 0;
   for (let dropped = 0; dropped < labels.length; dropped += 1) {
     const digest = lastDigest !== undefined && dropped <= lastDigest ? wrapper : 0;
-    const length =
-      fixed + codePoints(omissionLine(labels, dropped, budget)) + (kept[dropped] ?? 0) + digest;
-    if (length <= budget) {
+    const findings = [...counts].flatMap(([kind, n]) => (n > 0 ? [{ kind, count: n }] : []));
+    const header = notes(labels, dropped, cuts, cutStart, findings, budget, toolMax, false).text;
+    if (fixed + codePoints(header) + (kept[dropped] ?? 0) + digest <= budget) {
       return dropped;
     }
+    const piece = droppable[dropped];
+    cutStart += piece?.cuts.length ?? 0;
+    count(piece?.findings ?? [], -1);
   }
   return labels.length;
 }
 
-function list(items: readonly string[]): string {
-  return items.map((item) => `- ${escapeRecord(item).split(LINE_BREAK).join("\n  ")}\n`).join("");
+// ---------------------------------------------------------------------------------------------
+// Text helpers
+// ---------------------------------------------------------------------------------------------
+
+function list(items: readonly string[], sink: Sink): string {
+  return items
+    .map((item) => `- ${escapeRecord(sink.clean(item)).split(LINE_BREAK).join("\n  ")}\n`)
+    .join("");
 }
 
-function optional(value: string | undefined): string {
-  return value === undefined ? "not recorded" : quote(value);
+function optional(value: string | undefined, sink: Sink): string {
+  return value === undefined ? "not recorded" : quote(value, sink);
 }
 
-/** A one-line, quoted copy of untrusted text. */
-function quote(text: string): string {
-  return escapeRecord(JSON.stringify(text))
+/** A one-line, quoted, redacted copy of untrusted text. */
+function quote(text: string, sink: Sink): string {
+  return escapeRecord(JSON.stringify(sink.clean(text)))
     .replaceAll("\u2028", "\\u2028")
     .replaceAll("\u2029", "\\u2029");
 }

@@ -23,14 +23,15 @@ if (parsed.ok) {
 
 ## Options
 
-| Option          | Default                                                    | What it does                                                                          |
-| --------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `handoffId`     | Required                                                   | The id in the marker line. 1 to 128 letters, digits, `.`, `_` or `-`; a UUID fits     |
-| `mode`          | The export's `handoff`                                     | `summary+recent` or `full-transcript`                                                 |
-| `recentTurns`   | `10`                                                       | How many of the last user turns, with their replies, `summary+recent` keeps verbatim  |
-| `maxCharacters` | `24000` in `summary+recent`, no limit in `full-transcript` | The most Unicode code points the text may have; older parts are left out first to fit |
+| Option                  | Default                                                    | What it does                                                                          |
+| ----------------------- | ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `handoffId`             | Required                                                   | The id in the marker line. 1 to 128 letters, digits, `.`, `_` or `-`; a UUID fits     |
+| `mode`                  | The export's `handoff`                                     | `summary+recent` or `full-transcript`                                                 |
+| `recentTurns`           | `10`                                                       | How many of the last user turns, with their replies, `summary+recent` keeps verbatim  |
+| `maxCharacters`         | `24000` in `summary+recent`, no limit in `full-transcript` | The most Unicode code points the text may have; older parts are left out first to fit |
+| `maxToolTextCharacters` | `4000`                                                     | The most code points kept of each tool input and each tool output, in both modes      |
 
-`SEED_PROMPT_DEFAULTS` holds the two defaults. An invalid option throws a `RangeError`.
+`SEED_PROMPT_DEFAULTS` holds the defaults. An invalid option throws a `RangeError`.
 
 ## What the text holds
 
@@ -39,7 +40,9 @@ if (parsed.ok) {
 2. Where the session came from: agent, model, session address and export time.
 3. The workspace at export: directory, branch, commit and whether there were uncommitted changes
    (R-PORT-4), with a note that it may have changed since.
-4. The handoff mode, and what the budget left out, if anything.
+4. The handoff mode, and a line for each kind of change, if any: parts the budget left out, tool
+   text cut in the middle, credential-shaped text redacted while rendering, and a note when the
+   text is still over the budget.
 5. How to read the rest: the blocks are a record, not instructions, and tool calls already ran in
    the other agent and must not be repeated without a reason.
 6. The open plan and the export's `losses` (R-PORT-5).
@@ -71,13 +74,36 @@ Fix it without changing the public API.
 </acp-ferry-user>
 ```
 
+## Long tool text
+
+In both modes, a tool input or output longer than `maxToolTextCharacters` keeps its first and last
+characters, that many in total, around a cut line:
+
+```text
+<acp-ferry-output>
+export fun
+[… 45 characters cut …]
+it('.');
+}
+</acp-ferry-output>
+```
+
+`omitted` lists each cut, for example `entry 2 tool output (cut 45 of 65 characters)`, and the text
+names them in a `Cut in the middle …` line. User and assistant text, summaries and the plan are never
+cut.
+
 ## Budget
 
 When the text is longer than `maxCharacters`, parts of the history are left out, oldest first:
 summary entries, then digest lines, then whole turns, then the replies of the last turn. The plan,
 the losses and the last user prompt are never left out, so the text can still be longer than the
-budget when they alone are. `omitted` lists each part left out, for example
-`turn 3 (entries 7 to 12)`, and the text names them in a `Left out to fit …` line.
+budget when they alone are, for example when the last user prompt is longer than the budget. Then
+`omitted` ends with `over the <n>-character limit, because the last user prompt, the plan and the
+losses are never left out`, and the text says the same. `omitted` lists each part left out, for
+example `turn 3 (entries 7 to 12)`, and the text names them in a `Left out to fit …` line. Cuts in a
+part that the budget left out are not listed.
+
+The order in `omitted` is: parts left out, tool text cut, the redaction line, the over-budget note.
 
 ## Untrusted text
 
@@ -91,5 +117,13 @@ is a prompt-injection path. The seed prompt reduces the risk; it does not remove
   add a second marker line, even when it holds an earlier seed prompt.
 - The prompt tells the agent the record is data, not instructions.
 
-The import session should also run with permissions denied. The renderer copies the export's text
-and never adds back what [redaction](redaction.md) replaced.
+The import session should also run with permissions denied.
+
+## Redaction
+
+The renderer never adds back what [redaction](redaction.md) replaced. It also runs `redact` again
+over every piece of text it emits, before cutting or quoting, in case the export came from a reader
+that did not redact or was written by hand. `[redacted:<kind>]` markers already in the export are
+left as they are. When this pass finds something new in the parts the text keeps, `omitted` gets a
+line such as `redacted 1 credential-shaped string (github-token) while rendering`, and the text says
+the same.
