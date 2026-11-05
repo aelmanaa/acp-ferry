@@ -133,6 +133,13 @@ function assignment(match: string, groups: readonly (string | undefined)[]): str
   return `${head}${marker("secret-assignment")}${match.slice(head.length + value.length)}`;
 }
 
+// The (prefix, name) groups of a shell or flag assignment. A name of up to 128 characters may start
+// after any character that cannot sit in a name, or after a dash, as in `x.y-TOKEN`. The bound keeps
+// a run like `-a-a-a…` from being scanned once per dash. A longer name starts only at a boundary,
+// after any leading dashes, so each run of name characters is scanned once.
+const SHORT_NAME = "(^|[^A-Za-z0-9_.$])([A-Za-z_][\\w-]{0,127})";
+const LONG_NAME = "((?:^|[^A-Za-z0-9_.$-])-*)([A-Za-z_][\\w-]{128,})";
+
 // Rule order matters: whole blocks first, then fixed token shapes, then the generic rules, so that
 // a value already replaced by a specific rule is not counted again by `secret-assignment`.
 const RULES: readonly Rule[] = [
@@ -167,6 +174,14 @@ const RULES: readonly Rule[] = [
       /((?:proxy-)?authorization["']?\s*[:=]\s*["']?(?:bearer|basic|token)\s+)([A-Za-z0-9._~+/=-]{8,})/gi,
     replace: (_match, [prefix = ""]) => `${prefix}${marker("authorization-header")}`,
   },
+  // A bare Bearer token, for example in an SDK call or a log line. Stricter than the header rule,
+  // because "Bearer" also appears in prose: at least 16 characters, one of them a digit.
+  {
+    kind: "authorization-header",
+    pattern: /(?<![A-Za-z0-9_-])(bearer[ \t]+)([A-Za-z0-9._~+/=-]{16,})/gi,
+    replace: (_match, [prefix = "", token = ""]) =>
+      /\d/.test(token) ? `${prefix}${marker("authorization-header")}` : undefined,
+  },
   {
     kind: "url-credentials",
     pattern: /\b([a-z][a-z0-9+.-]{0,31}:\/\/)[^\s:/?#@[\]]*:[^\s/?#@]+@/gi,
@@ -182,10 +197,12 @@ const RULES: readonly Rule[] = [
       return assignment(match, [prefix, name, nameAndColon.slice(colon), open, value]);
     },
   },
-  // JSON inside a JSON string, as in a JSONL transcript: \"name\": \"value\".
+  // JSON inside a JSON string, as in a JSONL transcript: \"name\": \"value\". The value ends at
+  // the first \" that is not part of an escape of the inner string, such as \\\" or \\\\.
   {
     kind: "secret-assignment",
-    pattern: /()(\\"[^"\\\n]*\\"\s*:\s*)(\\")((?:[^"\\\n]|\\[^"\n])*)\\"/g,
+    pattern:
+      /()(\\"[^"\\\n]*\\"\s*:\s*)(\\")((?:[^"\\\n]|\\[^"\\\n]|\\\\(?:\\[^\n]|[^"\\\n]))*)\\"/g,
     replace: (match, [prefix, nameAndColon = "", open, value]) => {
       const colon = nameAndColon.lastIndexOf(":");
       const name = nameAndColon.slice(0, colon);
@@ -221,25 +238,27 @@ const RULES: readonly Rule[] = [
   },
   // Shell, .env, query strings and command-line flags: NAME=value, export NAME="value",
   // --auth-token=value, ?token=value. Quoted values first, so a value with spaces goes whole.
-  {
-    kind: "secret-assignment",
-    pattern: /(^|[^A-Za-z0-9_.$])([A-Za-z_][\w-]{0,127})(=)(["'])([^"'\n]*)\4/gm,
-    replace: assignment,
-  },
-  {
-    kind: "secret-assignment",
-    pattern: /(^|[^A-Za-z0-9_.$])([A-Za-z_][\w-]{0,127})(=)()([^\s"'`;&|=][^\s"'`;&|]*)/gm,
-    replace: assignment,
-  },
+  ...[SHORT_NAME, LONG_NAME].flatMap((name): Rule[] => [
+    {
+      kind: "secret-assignment",
+      pattern: new RegExp(`${name}(=)(["'])([^"'\\n]*)\\4`, "gm"),
+      replace: assignment,
+    },
+    {
+      kind: "secret-assignment",
+      pattern: new RegExp(`${name}(=)()([^\\s"'\`;&|=][^\\s"'\`;&|]*)`, "gm"),
+      replace: assignment,
+    },
+  ]),
 ];
 
 /**
  * Replaces credential-shaped text with `[redacted:<kind>]` and counts what it replaced (R-SEC-4).
  *
  * The rules are patterns, not a secret scanner: they catch known token prefixes, PEM private keys,
- * JSON Web Tokens, `Authorization` header values, passwords in URLs, and assignments whose name
- * contains `key`, `token`, `secret`, `password`, `passwd`, `credential` or `auth`. Running it on
- * its own output changes nothing. It never throws.
+ * JSON Web Tokens, `Authorization` header values, `Bearer` tokens, passwords in URLs, and
+ * assignments whose name contains `key`, `token`, `secret`, `password`, `passwd`, `credential` or
+ * `auth`. Running it on its own output changes nothing. It never throws.
  *
  * @param text - Any text from a transcript: a prompt, a reply, a tool input or output.
  * @returns The redacted text and, per kind, how many strings were replaced. Findings never hold

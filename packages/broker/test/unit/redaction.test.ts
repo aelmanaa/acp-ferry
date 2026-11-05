@@ -25,6 +25,11 @@ function expectRedacted(
   assert.deepEqual(twice.findings, []);
 }
 
+/** A JSONL line as a transcript writes it: a tool output that is JSON, serialised again. */
+function jsonlLine(token: string): string {
+  return JSON.stringify({ output: JSON.stringify({ token, id: "x" }) });
+}
+
 function expectUnchanged(input: string): void {
   const result = redact(input);
   assert.equal(result.text, input);
@@ -149,6 +154,32 @@ describe("redact: Authorization header values", () => {
     expectUnchanged('curl -H "Authorization: Bearer TOKEN"');
     expectUnchanged("send a Bearer token in the Authorization header");
   });
+
+  it("replaces a Bearer token without an Authorization header", () => {
+    const value = fake("", 24, "Fake0");
+    expectRedacted(
+      `the client sent Bearer ${value} to the API`,
+      "the client sent Bearer [redacted:authorization-header] to the API",
+      [{ kind: "authorization-header", count: 1 }],
+    );
+    expectRedacted(
+      `requests.get(url, headers={"X-Api": "bearer ${value}=="})`,
+      'requests.get(url, headers={"X-Api": "bearer [redacted:authorization-header]"})',
+      [{ kind: "authorization-header", count: 1 }],
+    );
+    expectRedacted(
+      `{"headers": {"X-Auth": "Bearer ${value}"}}`,
+      '{"headers": {"X-Auth": "Bearer [redacted:authorization-header]"}}',
+      [{ kind: "authorization-header", count: 1 }],
+    );
+  });
+
+  it("leaves a bare Bearer followed by a word, a placeholder or a short value", () => {
+    expectUnchanged("Bearer authentication schemes and BEARER_TOKEN_SETTINGS");
+    expectUnchanged("Bearer YOUR_ACCESS_TOKEN_HERE and Bearer <token>");
+    expectUnchanged("Bearer abc123 and Bearer $TOKEN and Bearer ${{ secrets.TOKEN }}");
+    expectUnchanged(`the cardbearer ${fake("", 24, "Fake0")} field`);
+  });
 });
 
 describe("redact: URLs with user info", () => {
@@ -199,6 +230,24 @@ describe("redact: assignments with a credential-like name", () => {
     );
   });
 
+  it("replaces shell and flag values whose name is longer than 128 characters", () => {
+    const long = `${"A".repeat(130)}_TOKEN`;
+    expectRedacted(`${long}=fakevalue7 npm test`, `${long}=[redacted:secret-assignment] npm test`, [
+      { kind: "secret-assignment", count: 1 },
+    ]);
+    expectRedacted(`export ${long}="fake value"`, `export ${long}="[redacted:secret-assignment]"`, [
+      { kind: "secret-assignment", count: 1 },
+    ]);
+    const flag = `--${"x-".repeat(70)}api-key`;
+    expectRedacted(`tool ${flag}=fakevalue8`, `tool ${flag}=[redacted:secret-assignment]`, [
+      { kind: "secret-assignment", count: 1 },
+    ]);
+    expectUnchanged(`${"A".repeat(200)}_NAME=value`);
+    expectRedacted("x.y-TOKEN=fakevalue9", "x.y-TOKEN=[redacted:secret-assignment]", [
+      { kind: "secret-assignment", count: 1 },
+    ]);
+  });
+
   it("replaces YAML values", () => {
     expectRedacted(
       "db:\n  password: fake pass phrase\n  user: app\n- client_secret: 'fakevalue'\n\"authToken\": fakevalue3",
@@ -224,6 +273,19 @@ describe("redact: assignments with a credential-like name", () => {
     expectRedacted(
       '{"output":"{\\"client_secret\\": \\"fakevalue6\\", \\"id\\": \\"x\\"}"}',
       '{"output":"{\\"client_secret\\": \\"[redacted:secret-assignment]\\", \\"id\\": \\"x\\"}"}',
+      [{ kind: "secret-assignment", count: 1 }],
+    );
+  });
+
+  it("replaces a whole escaped JSON value that holds an escaped quote or backslash", () => {
+    expectRedacted(
+      '{"output":"{\\"password\\":\\"abc\\\\\\"rest\\"}"}',
+      '{"output":"{\\"password\\":\\"[redacted:secret-assignment]\\"}"}',
+      [{ kind: "secret-assignment", count: 1 }],
+    );
+    expectRedacted(
+      jsonlLine('fake"quote\\"both\\\\\n\tend\u0001\\'),
+      jsonlLine("[redacted:secret-assignment]"),
       [{ kind: "secret-assignment", count: 1 }],
     );
   });
@@ -298,6 +360,16 @@ describe("redact: safety", () => {
       "a+".repeat(50_000),
       '"a": "'.repeat(20_000),
       "authorization: bearer ".repeat(10_000),
+      "Bearer ".repeat(20_000),
+      `Bearer ${"a".repeat(100_000)}`,
+      `bearer${" ".repeat(50_000)}x`,
+      '\\"token\\": \\"'.repeat(20_000),
+      `\\"token\\": \\"${"\\\\".repeat(50_000)}`,
+      `\\"token\\": \\"${"\\\\\\".repeat(30_000)}`,
+      "a".repeat(100_000),
+      "a-".repeat(50_000),
+      ` ${"-".repeat(100_000)}`,
+      `${"a".repeat(100_000)}=`.repeat(2),
     ]) {
       redact(input);
     }
