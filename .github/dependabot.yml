@@ -29,6 +29,10 @@ updates:
       prefix: chore
       include: scope
     labels: ["dependencies", "type:chore", "priority:P2"]
+    ignore:
+      # @types/node follows the Node floor (22.18.0); newer majors expose APIs the floor lacks.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
