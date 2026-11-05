@@ -78,7 +78,8 @@ session manager UI, a hosted service, moving live agent processes between hosts.
 - **R-PORT-2** Tool calls must travel as text (tool name, input, output, status), since tool names
   and semantics differ between agents.
 - **R-PORT-3** Must support two handoff modes: `summary+recent` (summary plus the last turns) and
-  `full-transcript`.
+  `full-transcript`. `summary+recent` keeps the last 10 user turns with their replies, within
+  24,000 characters, and builds the summary without a model call; both limits are options.
 - **R-PORT-4** Must carry the workspace state: working directory, git branch and commit, whether the
   checkout is dirty, and the open plan.
 - **R-PORT-5** Must list in the document what the export dropped, for example hidden reasoning.

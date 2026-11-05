@@ -12,6 +12,8 @@ Pages so far:
   and what the export drops.
 - [Claude Code session reader](reference/claude-reader.md): how a Claude Code transcript becomes a
   session export, and what the export drops.
+- [Seed prompt](reference/seed-prompt.md): the prompt that starts a moved session in the target
+  agent, in both handoff modes.
 
 Pages land with the features they describe, in four kinds (the Diátaxis layout):
 
