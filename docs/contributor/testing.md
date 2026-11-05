@@ -24,6 +24,9 @@ passes the right `--test-timeout` for the Node version.
 
 - Never start a real agent or call a model provider from unit or integration tests. Use a fake ACP
   agent that replays recorded messages.
+- The fake ACP agent is `packages/broker/test/support/fake-acp-agent.ts`. It replays a script of
+  JSON-RPC messages over stdio and logs what the client sent; the script format is in its header
+  comment.
 - Record transcript fixtures under `packages/<pkg>/test/fixtures/<agent>/<YYYY-MM-DD>-<case>.jsonl`,
   with the agent version in a sibling note. Strip tokens, account ids, personal paths and private
   content before committing.

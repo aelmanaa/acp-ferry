@@ -10,7 +10,7 @@
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "packages/broker": {
-      "entry": ["src/index.ts", "test/**/*.test.ts"],
+      "entry": ["src/index.ts", "test/**/*.test.ts", "test/support/fake-acp-agent.ts"],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     }
   }

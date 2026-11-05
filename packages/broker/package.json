@@ -2,7 +2,7 @@
   "name": "@acp-ferry/broker",
   "version": "0.0.0",
   "private": true,
-  "description": "Local broker for the acp-ferry draft Agent Client Protocol (ACP) extension. Early work: reads the workspace state, redacts and renders session exports.",
+  "description": "Local broker for the acp-ferry draft Agent Client Protocol (ACP) extension. Early work: reads the workspace state, redacts and renders session exports, and starts and prompts ACP agents.",
   "keywords": [
     "agent-client-protocol",
     "acp",
@@ -60,7 +60,9 @@
     "pkg:check": "publint --strict && attw --pack . --profile esm-only"
   },
   "dependencies": {
-    "@acp-ferry/spec": "workspace:*"
+    "@acp-ferry/spec": "workspace:*",
+    "@agentclientprotocol/sdk": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "c8": "catalog:"

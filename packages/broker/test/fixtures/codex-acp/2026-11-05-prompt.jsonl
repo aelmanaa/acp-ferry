@@ -1,0 +1,15 @@
+{"type":"header","agent":"codex-acp","version":"2.5.0","source":"Constructed from the adapter source at commit 34e0897, not recorded from a live run. See README.md."}
+{"type":"recv","message":{"jsonrpc":"2.0","id":0,"method":"initialize"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"promptCapabilities":{"image":true,"embeddedContext":true},"mcpCapabilities":{"http":true,"sse":false},"sessionCapabilities":{"resume":{},"list":{},"close":{},"delete":{},"additionalDirectories":{}}},"agentInfo":{"name":"codex-acp","title":"Codex","version":"2.5.0"},"authMethods":[]}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":1,"method":"session/new"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":1,"result":{"sessionId":"019a5c3e-codex-fixture","configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"gpt-5.5","options":[{"value":"gpt-5.5","name":"gpt-5.5"},{"value":"gpt-5.4-mini","name":"gpt-5.4-mini"}]}]}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":2,"method":"session/set_config_option"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":2,"result":{"configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"gpt-5.4-mini","options":[{"value":"gpt-5.5","name":"gpt-5.5"},{"value":"gpt-5.4-mini","name":"gpt-5.4-mini"}]}]}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":3,"method":"session/prompt"}}
+{"type":"send","message":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"019a5c3e-codex-fixture","update":{"sessionUpdate":"agent_thought_chunk","content":{"type":"text","text":"Thinking about the answer"}}}}}
+{"type":"send","message":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"019a5c3e-codex-fixture","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Hello"}}}}}
+{"type":"send","message":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"019a5c3e-codex-fixture","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":" from Codex."}}}}}
+{"type":"send","message":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"019a5c3e-codex-fixture","update":{"sessionUpdate":"usage_update","used":9120,"size":258400}}}}
+{"type":"send","message":{"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":4,"method":"session/close"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":4,"result":{}}}

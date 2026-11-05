@@ -1,0 +1,9 @@
+{"type":"header","agent":"claude-agent-acp","version":"0.101.0","source":"Constructed from the adapter source at commit 85aec26, not recorded from a live run. See README.md."}
+{"type":"recv","message":{"jsonrpc":"2.0","id":0,"method":"initialize"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"promptCapabilities":{"image":true,"embeddedContext":true},"mcpCapabilities":{"http":true,"sse":true},"sessionCapabilities":{"resume":{},"list":{},"close":{},"delete":{},"additionalDirectories":{}}},"agentInfo":{"name":"@agentclientprotocol/claude-agent-acp","title":"Claude Agent","version":"0.101.0"},"authMethods":[]}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":1,"method":"session/new"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":1,"result":{"sessionId":"0b7f8a52-claude-fixture","configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"default","options":[{"value":"default","name":"Default (recommended)"},{"value":"opus","name":"Opus"},{"value":"sonnet","name":"Sonnet"},{"value":"haiku","name":"Haiku"}]}]}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":2,"method":"session/prompt"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":2,"error":{"code":-32603,"message":"Internal error: rate limit reached","data":{"errorKind":"rate_limit"}}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":3,"method":"session/close"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":3,"result":{}}}

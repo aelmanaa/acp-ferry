@@ -44,3 +44,28 @@ export {
   SEED_PROMPT_DEFAULTS,
 } from "./handoff/render.ts";
 export type { RenderSeedPromptOptions, SeedPrompt } from "./handoff/render.ts";
+
+export { AcpAgent, startAgent } from "./acp/client.ts";
+export type {
+  AcpLogEntry,
+  AcpSession,
+  AgentExit,
+  ContextUsage,
+  PromptOutput,
+  PromptResult,
+  PromptToolCall,
+  StartAgentOptions,
+} from "./acp/client.ts";
+export { AcpClientError } from "./acp/errors.ts";
+export type { AcpClientErrorCode, AgentRpcError } from "./acp/errors.ts";
+export { limitEventOf } from "./acp/limits.ts";
+export type { PromptFailure } from "./acp/limits.ts";
+export { findModelOption, resolveModelValue } from "./acp/models.ts";
+export type { ModelChoice, ModelOption } from "./acp/models.ts";
+export { denyAllPermissions } from "./acp/permissions.ts";
+export type {
+  PermissionChoice,
+  PermissionDecision,
+  PermissionPolicy,
+  PermissionRequest,
+} from "./acp/permissions.ts";
