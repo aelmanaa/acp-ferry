@@ -148,11 +148,18 @@ session manager UI, a hosted service, moving live agent processes between hosts.
 
 ## Open questions
 
-| Question                                                                                                  | Owner      | Needed by |
-| --------------------------------------------------------------------------------------------------------- | ---------- | --------- |
-| Do claude-agent-acp and codex-acp expose the model config option and `usage_update`?                      | Maintainer | M1        |
-| Can Claude Code resume a session written by another tool, or must import go through a new session prompt? | Maintainer | M1        |
-| Session address: is `acp://` acceptable to the ACP maintainers, or should it be a URN or a plain tuple?   | Maintainer | M4        |
-| Which third agent: Gemini CLI, or Goose or OpenCode on a low-cost or local model?                         | Maintainer | M2        |
-| How do agents report rate limits and quota today, and can they map to `LimitEvent` without guessing?      | Maintainer | M3        |
-| Does ACP v2 (draft) add anything that overlaps delegation or export?                                      | Maintainer | M4        |
+| Question                                                                                                | Owner      | Needed by |
+| ------------------------------------------------------------------------------------------------------- | ---------- | --------- |
+| Session address: is `acp://` acceptable to the ACP maintainers, or should it be a URN or a plain tuple? | Maintainer | M4        |
+| Which third agent: Gemini CLI, or Goose or OpenCode on a low-cost or local model?                       | Maintainer | M2        |
+| How do agents report rate limits and quota today, and can they map to `LimitEvent` without guessing?    | Maintainer | M3        |
+| Does ACP v2 (draft) add anything that overlaps delegation or export?                                    | Maintainer | M4        |
+
+## Answered questions
+
+- Do claude-agent-acp and codex-acp expose the model config option and `usage_update`? Yes, both.
+  codex-acp reports no cost. See [adapters.md](adapters.md#acp-capabilities) (#7).
+- Can Claude Code resume a session written by another tool, or must import go through a new session
+  prompt? A transcript in Claude Code's own format would load, but that format has no published
+  schema. M1 imports through a new session and a seed prompt. See
+  [adapters.md](adapters.md#importing-a-session-into-each-agent) (#7).

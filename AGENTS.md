@@ -29,6 +29,8 @@ maintainer's.
 7. [docs/contributor/testing.md](docs/contributor/testing.md): test layers and rules.
 8. [docs/contributor/tooling.md](docs/contributor/tooling.md): toolchain and the type-checking layout.
 9. [docs/contributor/releasing.md](docs/contributor/releasing.md): release plan and first publish.
+10. [docs/contributor/adapters.md](docs/contributor/adapters.md): what claude-agent-acp and
+    codex-acp support, and where Claude Code and Codex store sessions.
 
 User docs live in [docs/user/](docs/user/README.md); the index for people is
 [docs/README.md](docs/README.md). Reference pages so far:
@@ -61,7 +63,7 @@ natively. pnpm 12.16.1 (`packageManager`).
 | `packages/*/test/unit/` | Unit tests, `*.test.ts`                                                                                                                                     |
 | `scripts/`              | Repository scripts run with plain `node`: git hooks, type-escape check, test runner                                                                         |
 | `docs/user/`            | User documentation (written as features land)                                                                                                               |
-| `docs/contributor/`     | Requirements, architecture, spec draft, roadmap, decisions, prior art, testing, tooling, releasing                                                          |
+| `docs/contributor/`     | Requirements, architecture, spec draft, roadmap, decisions, prior art, testing, tooling, releasing, adapters                                                |
 | `.github/`              | CI, issue and pull request templates, Dependabot, CODEOWNERS                                                                                                |
 | `.changeset/`           | Pending release notes                                                                                                                                       |
 

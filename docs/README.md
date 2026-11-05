@@ -24,5 +24,6 @@ User documentation is written as features land: [user/README.md](user/README.md)
 | [Testing](contributor/testing.md)            | Test layers and rules                                    |
 | [Tooling](contributor/tooling.md)            | Toolchain and type-checking layout                       |
 | [Releasing](contributor/releasing.md)        | Release plan and first publish                           |
+| [Adapters](contributor/adapters.md)          | ACP adapter capabilities and session file formats        |
 | [Contributing](../CONTRIBUTING.md)           | Issues, labels, workflow, changesets                     |
 | [Security](../SECURITY.md)                   | Reporting vulnerabilities                                |
