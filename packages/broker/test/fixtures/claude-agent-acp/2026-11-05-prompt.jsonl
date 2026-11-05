@@ -1,0 +1,18 @@
+{"type":"header","agent":"claude-agent-acp","version":"0.101.0","source":"Constructed from the adapter source at commit 85aec26, not recorded from a live run. See README.md."}
+{"type":"recv","message":{"jsonrpc":"2.0","id":0,"method":"initialize"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":true,"promptCapabilities":{"image":true,"embeddedContext":true},"mcpCapabilities":{"http":true,"sse":true},"sessionCapabilities":{"resume":{},"list":{},"close":{},"delete":{},"additionalDirectories":{}}},"agentInfo":{"name":"@agentclientprotocol/claude-agent-acp","title":"Claude Agent","version":"0.101.0"},"authMethods":[]}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":1,"method":"session/new"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":1,"result":{"sessionId":"0b7f8a52-claude-fixture","configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"default","options":[{"value":"default","name":"Default (recommended)"},{"value":"opus","name":"Opus"},{"value":"sonnet","name":"Sonnet"},{"value":"haiku","name":"Haiku"}]}]}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":2,"method":"session/set_config_option"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":2,"result":{"configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"opus","options":[{"value":"default","name":"Default (recommended)"},{"value":"opus","name":"Opus"},{"value":"sonnet","name":"Sonnet"},{"value":"haiku","name":"Haiku"}]}]}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":3,"method":"session/prompt"}}
+{"type":"send","message":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"0b7f8a52-claude-fixture","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Reading the README"}}}}}
+{"type":"send","message":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"0b7f8a52-claude-fixture","update":{"sessionUpdate":"tool_call","toolCallId":"toolu_fixture_1","title":"Read README.md","kind":"read","status":"pending","rawInput":{"file_path":"/workspace/README.md"}}}}}
+{"type":"send","message":{"jsonrpc":"2.0","id":0,"method":"session/request_permission","params":{"sessionId":"0b7f8a52-claude-fixture","toolCall":{"toolCallId":"toolu_fixture_1","title":"Read README.md","kind":"read"},"options":[{"optionId":"allow_always","name":"Always Allow","kind":"allow_always"},{"optionId":"allow","name":"Allow","kind":"allow_once"},{"optionId":"reject","name":"Reject","kind":"reject_once"}]}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":0}}
+{"type":"send","message":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"0b7f8a52-claude-fixture","update":{"sessionUpdate":"tool_call_update","toolCallId":"toolu_fixture_1","status":"failed"}}}}
+{"type":"send","message":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"0b7f8a52-claude-fixture","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":". Permission was denied, so here is a short answer."}}}}}
+{"type":"send","message":{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"0b7f8a52-claude-fixture","update":{"sessionUpdate":"usage_update","used":18234,"size":200000,"cost":{"amount":0.0421,"currency":"USD"},"_meta":{"_claude/model":"claude-opus"}}}}}
+{"type":"send","message":{"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn"}}}
+{"type":"recv","message":{"jsonrpc":"2.0","id":4,"method":"session/close"}}
+{"type":"send","message":{"jsonrpc":"2.0","id":4,"result":{}}}

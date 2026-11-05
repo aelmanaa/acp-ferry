@@ -8,7 +8,7 @@ Status: in design; nothing is published to npm yet. The repository has the toolc
 contract (`packages/spec/src/types.ts`), identifier parsers, the `SessionExport` JSON Schema and
 validator, the plan, and the first broker code:
 the workspace state reader, credential redaction, the Codex and Claude Code session readers for
-session exports, and the seed prompt renderer.
+session exports, the seed prompt renderer, and a minimal ACP client.
 
 ## Start here
 
@@ -46,6 +46,8 @@ User docs live in [docs/user/](docs/user/README.md); the index for people is
   what it exports from a Claude Code transcript, what it drops, and its error codes.
 - [docs/user/reference/seed-prompt.md](docs/user/reference/seed-prompt.md): `renderSeedPrompt`,
   the handoff modes, the budget, the marker line and how untrusted history is fenced.
+- [docs/user/reference/acp-client.md](docs/user/reference/acp-client.md): `startAgent`, sessions,
+  `setModel`, `prompt`, the permission policy, `limitEventOf` and the error codes.
 
 ## Commands
 
@@ -63,16 +65,16 @@ natively. pnpm 12.16.1 (`packageManager`).
 
 ## Where things are
 
-| Path                    | Contents                                                                                                                                                    |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/spec/src/`    | Draft types, identifier parsers and the `SessionExport` validator. Runtime-neutral: no Node built-ins (lint rule and a build without Node types enforce it) |
-| `packages/broker/src/`  | The broker. Node-only. Today: workspace state (`workspace.ts`), redaction (`redaction.ts`), the readers (`readers/`) and the seed prompt (`handoff/`)       |
-| `packages/*/test/unit/` | Unit tests, `*.test.ts`                                                                                                                                     |
-| `scripts/`              | Repository scripts run with plain `node`: git hooks, type-escape check, test runner                                                                         |
-| `docs/user/`            | User documentation (written as features land)                                                                                                               |
-| `docs/contributor/`     | Requirements, architecture, spec draft, roadmap, decisions, prior art, testing, tooling, releasing, adapters                                                |
-| `.github/`              | CI, issue and pull request templates, Dependabot, CODEOWNERS                                                                                                |
-| `.changeset/`           | Pending release notes                                                                                                                                       |
+| Path                    | Contents                                                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/spec/src/`    | Draft types, identifier parsers and the `SessionExport` validator. Runtime-neutral: no Node built-ins (lint rule and a build without Node types enforce it)                    |
+| `packages/broker/src/`  | The broker. Node-only. Today: workspace state (`workspace.ts`), redaction (`redaction.ts`), the readers (`readers/`), the seed prompt (`handoff/`) and the ACP client (`acp/`) |
+| `packages/*/test/unit/` | Unit tests, `*.test.ts`                                                                                                                                                        |
+| `scripts/`              | Repository scripts run with plain `node`: git hooks, type-escape check, test runner                                                                                            |
+| `docs/user/`            | User documentation (written as features land)                                                                                                                                  |
+| `docs/contributor/`     | Requirements, architecture, spec draft, roadmap, decisions, prior art, testing, tooling, releasing, adapters                                                                   |
+| `.github/`              | CI, issue and pull request templates, Dependabot, CODEOWNERS                                                                                                                   |
+| `.changeset/`           | Pending release notes                                                                                                                                                          |
 
 ## Rules for every change
 

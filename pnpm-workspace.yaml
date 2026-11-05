@@ -13,9 +13,10 @@ lockfile:
 allowBuilds:
   lefthook: false
 
-# Versions of the development tools, shared by every package. Same versions as explorer-verify on
-# 2026-11-05; Dependabot moves them from here.
+# Versions shared by every package: the development tools (same versions as explorer-verify on
+# 2026-11-05) and the runtime dependencies. Dependabot moves them from here.
 catalog:
+  "@agentclientprotocol/sdk": "2.1.0"
   "@arethetypeswrong/cli": "0.18.5"
   "@changesets/changelog-github": "1.0.1"
   "@changesets/cli": "3.0.3"
@@ -31,3 +32,4 @@ catalog:
   "oxlint-tsgolint": "7.0.2005"
   "publint": "0.3.25"
   "typescript": "7.0.2"
+  "zod": "4.6.7"
