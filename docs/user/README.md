@@ -1,7 +1,11 @@
 # User documentation
 
-Audience: developers who run acp-ferry with their coding agents. Nothing is released yet, so this
-section is empty.
+Audience: developers who run acp-ferry with their coding agents. Nothing is released yet.
+
+Pages so far:
+
+- [Workspace state](reference/workspace-state.md): what a session export records about the
+  directory and git checkout, and the errors when it cannot.
 
 Pages land with the features they describe, in four kinds (the Diátaxis layout):
 

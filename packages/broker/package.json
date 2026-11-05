@@ -2,7 +2,7 @@
   "name": "@acp-ferry/broker",
   "version": "0.0.0",
   "private": true,
-  "description": "Planned local broker that drives coding agents over the Agent Client Protocol (ACP) and serves calling agents over MCP. Placeholder; not implemented.",
+  "description": "Local broker for the acp-ferry draft Agent Client Protocol (ACP) extension. Early work: reads the workspace state for session exports.",
   "keywords": [
     "agent-client-protocol",
     "acp",
@@ -58,6 +58,9 @@
     "test:unit": "node ../../scripts/node-test.ts unit \"test/unit/**/*.test.ts\"",
     "coverage": "c8 --check-coverage node --test \"test/unit/**/*.test.ts\"",
     "pkg:check": "publint --strict && attw --pack . --profile esm-only"
+  },
+  "dependencies": {
+    "@acp-ferry/spec": "workspace:*"
   },
   "devDependencies": {
     "c8": "catalog:"
