@@ -9,6 +9,7 @@ User documentation is written as features land: [user/README.md](user/README.md)
 | Page                                                 | What it covers                                               |
 | ---------------------------------------------------- | ------------------------------------------------------------ |
 | [Workspace state](user/reference/workspace-state.md) | Directory, branch, commit and dirty state in session exports |
+| [Redaction](user/reference/redaction.md)             | Credential-shaped text removed from session exports          |
 
 ## Contributors
 

@@ -6,6 +6,8 @@ Pages so far:
 
 - [Workspace state](reference/workspace-state.md): what a session export records about the
   directory and git checkout, and the errors when it cannot.
+- [Redaction](reference/redaction.md): which credential-shaped text an export replaces, and which
+  files it never exports.
 
 Pages land with the features they describe, in four kinds (the Diátaxis layout):
 

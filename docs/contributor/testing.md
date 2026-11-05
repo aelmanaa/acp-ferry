@@ -32,3 +32,17 @@ passes the right `--test-timeout` for the Node version.
 - Every permission and budget rule (R-SEC, R-BUDGET) gets a test that tries to break it.
 - Live tests run only on the maintainer's machine, use the maintainer's own accounts, and record
   the date, agent versions and result in the issue.
+
+## Redaction
+
+Fixtures are recorded from real agents, so they can carry what the agent saw. The fixture guard
+(`packages/broker/test/unit/fixture-guard.test.ts`) runs in `pnpm test`. It scans every file under
+`packages/*/test/fixtures/` with the same rules as `redact` (see
+[Redaction](../user/reference/redaction.md)) and fails when a file has a credential-shaped string
+or a sensitive file name such as `.env`. The failure names the file and the kinds, never the value.
+
+- Record fixtures on a throwaway project with throwaway accounts where possible.
+- Before committing a fixture, run it through `redact` and keep the `[redacted:<kind>]` markers.
+- Never write a credential-shaped literal in a test. Build fake values at run time from parts with
+  an obvious filler, as `packages/broker/test/support/fake-secrets.ts` does, so the repository and
+  GitHub secret scanning never see a real-looking key.
