@@ -1,7 +1,7 @@
 {
   "name": "@acp-ferry/broker",
   "version": "0.0.0",
-  "private": false,
+  "private": true,
   "description": "Planned local broker that drives coding agents over the Agent Client Protocol (ACP) and serves calling agents over MCP. Placeholder; not implemented.",
   "keywords": [
     "agent-client-protocol",

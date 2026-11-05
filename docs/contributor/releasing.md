@@ -1,8 +1,8 @@
 # Releasing
 
 Audience: the maintainer. Nothing is published yet. Both packages are at `0.0.0` with
-`"private": false`, so the manifests are ready for publishing checks, but no release workflow
-exists and nobody publishes before M4.
+`"private": true`, so a manual `npm publish` fails. No release workflow exists. The release pull
+request in M4 sets `"private": false`.
 
 ## Plan
 
