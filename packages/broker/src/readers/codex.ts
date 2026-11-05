@@ -21,18 +21,31 @@ import {
   parseSessionExport,
   SESSION_EXPORT_LIMITS,
 } from "@acp-ferry/spec";
-import type { ModelId, SessionExport, TranscriptEntry, WorkspaceRef } from "@acp-ferry/spec";
+import type { ModelId, SessionExport, TranscriptEntry } from "@acp-ferry/spec";
 
 import {
-  isSensitivePath,
   mergeRedactionFindings,
   redact,
   redactionLosses,
   SENSITIVE_FILE_PLACEHOLDER,
 } from "../redaction.ts";
 import type { RedactionFinding } from "../redaction.ts";
-import { describeWorkspaceDrift, readWorkspace, WorkspaceError } from "../workspace.ts";
+import { describeWorkspaceDrift } from "../workspace.ts";
 import type { ReadWorkspaceOptions, RecordedWorkspace } from "../workspace.ts";
+import {
+  asObject,
+  asObjectOrArray,
+  Counter,
+  field,
+  LossLines,
+  parseJson,
+  patchNamesSensitiveFile,
+  plural,
+  readWorkspaceOrFallback,
+  textField,
+  tokensNameSensitiveFile,
+  truncate,
+} from "./common.ts";
 
 /**
  * The ACP Registry id of the Codex adapter, used in the export's source address (R-ID-1, R-ID-3).
@@ -190,7 +203,16 @@ export async function readCodexSession(options: ReadCodexSessionOptions): Promis
     ...(meta.branch === undefined ? {} : { branch: meta.branch }),
     ...(meta.commit === undefined ? {} : { commit: meta.commit }),
   };
-  const workspace = await currentWorkspace(meta.cwd, recorded, options.workspace, losses);
+  const { workspace, missing } = await readWorkspaceOrFallback(meta.cwd, options.workspace, {
+    cwd: meta.cwd,
+    ...recorded,
+    dirty: false,
+  });
+  if (missing) {
+    losses.push(
+      "the workspace directory no longer exists; branch and commit are as the session recorded them",
+    );
+  }
   losses.push(...describeWorkspaceDrift(recorded, workspace));
   losses.push(...redactionLosses(built.findings));
 
@@ -337,25 +359,6 @@ async function* readLines(file: string): AsyncGenerator<string> {
   }
 }
 
-async function currentWorkspace(
-  cwd: string,
-  recorded: RecordedWorkspace,
-  options: ReadWorkspaceOptions | undefined,
-  losses: string[],
-): Promise<WorkspaceRef> {
-  try {
-    return await readWorkspace(cwd, options);
-  } catch (error) {
-    if (error instanceof WorkspaceError && error.code === "cwd-not-found") {
-      losses.push(
-        "the workspace directory no longer exists; branch and commit are as the session recorded them",
-      );
-      return { cwd, ...recorded, dirty: false };
-    }
-    throw error;
-  }
-}
-
 function modelId(provider: string | undefined, model: string | undefined): ModelId | undefined {
   if (provider === undefined || model === undefined) {
     return undefined;
@@ -401,7 +404,6 @@ const IMPORT_MARKER = "<EXTERNAL SESSION IMPORTED>";
 // A whole message wrapped in one tag, such as <environment_context>…</environment_context>.
 const INJECTED_TAG = /^\s*<([a-z][a-z0-9_]*)>[\s\S]*<\/\1>\s*$/;
 const INJECTED_PREFIX = "# AGENTS.md instructions";
-const PATCH_PATH = /^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$/gm;
 const TOKEN_SEPARATORS = /[\s"'`;|&<>(),=]+/;
 const PRINTABLE_TYPE = /^[a-z][a-z0-9_]{0,63}$/;
 const TRUNCATED = "\n[truncated by acp-ferry]";
@@ -429,30 +431,6 @@ interface Built {
   readonly plan: readonly string[];
   readonly losses: readonly string[];
   readonly findings: readonly RedactionFinding[];
-}
-
-class Counter {
-  readonly #counts = new Map<string, number>();
-
-  add(key: string, count = 1): void {
-    this.#counts.set(key, (this.#counts.get(key) ?? 0) + count);
-  }
-
-  get(key: string): number {
-    return this.#counts.get(key) ?? 0;
-  }
-
-  total(): number {
-    return [...this.#counts.values()].reduce((sum, count) => sum + count, 0);
-  }
-
-  /** `name 2, other 1`, sorted by name. */
-  describe(): string {
-    return [...this.#counts]
-      .toSorted(([a], [b]) => a.localeCompare(b))
-      .map(([key, count]) => `${key} ${String(count)}`)
-      .join(", ");
-  }
 }
 
 class RolloutState {
@@ -486,7 +464,7 @@ class RolloutState {
       return;
     }
     const type = field(record, "type");
-    const payload = asObject(field(record, "payload"));
+    const payload = asObjectOrArray(field(record, "payload"));
     if (typeof type !== "string" || payload === undefined) {
       this.#counts.add("malformed");
       return;
@@ -505,7 +483,7 @@ class RolloutState {
         break;
     }
     if (type === "turn_context") {
-      this.model = text(field(payload, "model")) ?? this.model;
+      this.model = textField(payload, "model") ?? this.model;
     } else if (type === "event_msg" && field(payload, "type") === "agent_message") {
       if (field(payload, "message") === IMPORT_MARKER) {
         this.#importedTurns = this.#userTurns();
@@ -558,82 +536,75 @@ class RolloutState {
 
   #losses(droppedEntries: number): string[] {
     const count = (key: string): number => this.#counts.get(key);
-    const lines: string[] = [];
-    const add = (n: number, line: string): void => {
-      if (n > 0) {
-        lines.push(line);
-      }
-    };
-    add(
+    const lines = new LossLines();
+    lines.add(
       this.#importedTurns ?? 0,
       `the first ${plural(this.#importedTurns ?? 0, "user turn")} were imported into Codex from another agent`,
     );
-    add(
+    lines.add(
       count("reasoning"),
       `dropped ${plural(count("reasoning"), "reasoning item")}: encrypted reasoning cannot move between vendors, and reasoning summaries are not exported`,
     );
-    add(
+    lines.add(
       count("injected"),
       `skipped ${plural(count("injected"), "context message")} that Codex injects itself (instructions, environment context)`,
     );
-    add(
+    lines.add(
       count("summary"),
       `Codex compacted the context ${plural(count("summary"), "time")} with a readable summary; each summary is kept as a summary entry, and the turns before it are kept too`,
     );
-    add(
+    lines.add(
       count("encrypted-compaction"),
       `Codex compacted the context ${plural(count("encrypted-compaction"), "time")} with an encrypted summary; the summary is dropped, and the turns before it are kept`,
     );
-    add(
+    lines.add(
       count("sensitive"),
       `omitted the output of ${plural(count("sensitive"), "tool call")} that named a sensitive file`,
     );
-    add(count("no-output"), `dropped ${plural(count("no-output"), "tool call")} with no output`);
-    add(
+    lines.add(
+      count("no-output"),
+      `dropped ${plural(count("no-output"), "tool call")} with no output`,
+    );
+    lines.add(
       count("orphan-output"),
       `dropped ${plural(count("orphan-output"), "tool output")} with no matching call`,
     );
-    add(
+    lines.add(
       count("attachment"),
       `dropped ${plural(count("attachment"), "image or file", "images and files")} attached to messages or tool outputs`,
     );
-    add(
+    lines.add(
       this.#droppedItems.total(),
       `dropped ${plural(this.#droppedItems.total(), "response item")} with no portable form (${this.#droppedItems.describe()})`,
     );
     const subagent = count("inter-agent") + count("subagent-call");
-    add(
+    lines.add(
       subagent,
       `dropped ${plural(subagent, "subagent record")} (${String(count("spawned"))} spawned); subagent threads are not exported`,
     );
-    add(
+    lines.add(
       this.#skippedRecords.total(),
       `dropped ${plural(this.#skippedRecords.total(), "Codex record")} with no transcript content (${this.#skippedRecords.describe()})`,
     );
-    add(count("malformed"), `skipped ${plural(count("malformed"), "malformed line")}`);
-    add(count("unknown"), `skipped ${plural(count("unknown"), "record")} of unknown type`);
-    add(
+    lines.add(count("malformed"), `skipped ${plural(count("malformed"), "malformed line")}`);
+    lines.add(count("unknown"), `skipped ${plural(count("unknown"), "record")} of unknown type`);
+    lines.add(
       count("truncated"),
       `truncated ${plural(count("truncated"), "text")} longer than the export limit`,
     );
-    add(
+    lines.add(
       droppedEntries,
       `dropped the oldest ${plural(droppedEntries, "entry", "entries")} to fit the limit of ${String(SESSION_EXPORT_LIMITS.maxEntries)}`,
     );
-    return lines;
+    return lines.lines;
   }
 
   #limit(value: string, max: number): string {
-    if (value.length <= max) {
-      return value;
+    const result = truncate(value, max, () => TRUNCATED);
+    if (result.cut) {
+      this.#counts.add("truncated");
     }
-    this.#counts.add("truncated");
-    let cut = value.slice(0, max - TRUNCATED.length);
-    // Do not leave half a surrogate pair at the cut.
-    if (/[\uD800-\uDBFF]$/.test(cut)) {
-      cut = cut.slice(0, -1);
-    }
-    return cut + TRUNCATED;
+    return result.text;
   }
 
   #userTurns(): number {
@@ -646,8 +617,8 @@ class RolloutState {
 
   #sessionMeta(payload: object): void {
     // Only these fields are read. Account fields such as creator_user_id are never touched.
-    const id = text(field(payload, "id"))?.toLowerCase();
-    const cwd = text(field(payload, "cwd"));
+    const id = textField(payload, "id")?.toLowerCase();
+    const cwd = textField(payload, "cwd");
     if (this.#metaIsThread || cwd === undefined || !path.isAbsolute(cwd)) {
       return;
     }
@@ -655,9 +626,9 @@ class RolloutState {
       return;
     }
     const git = field(payload, "git");
-    const provider = text(field(payload, "model_provider"));
-    const branch = text(field(git, "branch"));
-    const commit = text(field(git, "commit_hash"));
+    const provider = textField(payload, "model_provider");
+    const branch = textField(git, "branch");
+    const commit = textField(git, "commit_hash");
     const source = field(payload, "source");
     this.meta = {
       cwd,
@@ -665,14 +636,14 @@ class RolloutState {
       ...(branch === undefined ? {} : { branch }),
       ...(commit === undefined ? {} : { commit }),
       subagent:
-        text(field(payload, "parent_thread_id")) !== undefined ||
+        textField(payload, "parent_thread_id") !== undefined ||
         field(source, "subagent") !== undefined,
     };
     this.#metaIsThread = id === this.#threadId;
   }
 
   #responseItem(item: object): void {
-    const type = text(field(item, "type")) ?? "";
+    const type = textField(item, "type") ?? "";
     switch (type) {
       case "message":
         this.#message(item);
@@ -682,10 +653,10 @@ class RolloutState {
         this.#counts.add("reasoning");
         return;
       case "function_call":
-        this.#call(item, functionName(item), text(field(item, "arguments")) ?? "");
+        this.#call(item, functionName(item), textField(item, "arguments") ?? "");
         return;
       case "custom_tool_call":
-        this.#call(item, text(field(item, "name")) ?? "unknown", text(field(item, "input")) ?? "");
+        this.#call(item, textField(item, "name") ?? "unknown", textField(item, "input") ?? "");
         return;
       case "local_shell_call":
         this.#call(item, "local_shell", shellCommand(field(item, "action")));
@@ -713,7 +684,7 @@ class RolloutState {
     const texts: string[] = [];
     let injected = false;
     for (const part of parts) {
-      const value = text(field(part, "text"));
+      const value = textField(part, "text");
       if (value === undefined) {
         this.#counts.add("attachment");
       } else if (role === "user" && isInjected(value)) {
@@ -738,7 +709,7 @@ class RolloutState {
   }
 
   #call(item: object, tool: string, input: string): void {
-    const callId = text(field(item, "call_id")) ?? text(field(item, "id"));
+    const callId = textField(item, "call_id") ?? textField(item, "id");
     if (callId === undefined) {
       this.#counts.add("no-output");
       return;
@@ -746,7 +717,7 @@ class RolloutState {
     if (isSubagentTool(item)) {
       this.#subagentCalls.add(callId);
       this.#counts.add("subagent-call");
-      if (text(field(item, "name")) === "spawn_agent") {
+      if (textField(item, "name") === "spawn_agent") {
         this.#counts.add("spawned");
       }
       return;
@@ -769,7 +740,7 @@ class RolloutState {
   }
 
   #output(item: object): void {
-    const callId = text(field(item, "call_id")) ?? "";
+    const callId = textField(item, "call_id") ?? "";
     if (this.#subagentCalls.has(callId)) {
       this.#counts.add("subagent-call");
       return;
@@ -787,14 +758,14 @@ class RolloutState {
     if (typeof output === "string") {
       return output;
     }
-    if (asObject(output) !== undefined && !Array.isArray(output)) {
+    if (asObject(output) !== undefined) {
       // Older rollouts: { content, success }.
-      return text(field(output, "content")) ?? "";
+      return textField(output, "content") ?? "";
     }
     const parts = Array.isArray(output) ? output : [];
     const texts: string[] = [];
     for (const part of parts) {
-      const value = text(field(part, "text"));
+      const value = textField(part, "text");
       if (value === undefined) {
         this.#counts.add("attachment");
       } else {
@@ -805,7 +776,7 @@ class RolloutState {
   }
 
   #compacted(payload: object): void {
-    const summary = text(field(payload, "message")) ?? "";
+    const summary = textField(payload, "message") ?? "";
     if (summary.trim() === "") {
       this.#counts.add("encrypted-compaction");
       return;
@@ -828,14 +799,14 @@ function isInjected(value: string): boolean {
 }
 
 function functionName(item: object): string {
-  const name = text(field(item, "name")) ?? "unknown";
-  const namespace = text(field(item, "namespace"));
+  const name = textField(item, "name") ?? "unknown";
+  const namespace = textField(item, "namespace");
   return namespace === undefined || namespace === "" ? name : `${namespace}.${name}`;
 }
 
 function isSubagentTool(item: object): boolean {
-  const namespace = text(field(item, "namespace")) ?? "";
-  const name = text(field(item, "name")) ?? "";
+  const namespace = textField(item, "namespace") ?? "";
+  const name = textField(item, "name") ?? "";
   return SUBAGENT_NAMESPACES.has(namespace) || (namespace === "" && SUBAGENT_TOOLS.has(name));
 }
 
@@ -854,7 +825,7 @@ function openSteps(input: string): readonly string[] | undefined {
     return undefined;
   }
   return steps.flatMap((step: unknown) => {
-    const name = text(field(step, "step"));
+    const name = textField(step, "step");
     return name === undefined || field(step, "status") === "completed" ? [] : [name];
   });
 }
@@ -866,12 +837,8 @@ function namesSensitiveFile(input: string): { readonly any: boolean; readonly pa
   let named = false;
   let patch = false;
   for (const value of strings) {
-    for (const match of value.matchAll(PATCH_PATH)) {
-      if (isSensitivePath((match[1] ?? "").trim())) {
-        patch = true;
-      }
-    }
-    named ||= value.split(TOKEN_SEPARATORS).some((token) => token !== "" && isSensitivePath(token));
+    patch ||= patchNamesSensitiveFile(value);
+    named ||= tokensNameSensitiveFile(value, TOKEN_SEPARATORS);
   }
   return { any: named || patch, patch };
 }
@@ -883,7 +850,7 @@ function stringsIn(value: unknown, depth: number): string[] {
   if (depth > 8) {
     return [];
   }
-  const object = asObject(value);
+  const object = asObjectOrArray(value);
   const children: readonly unknown[] = object === undefined ? [] : Object.values(object);
   return children.flatMap((child) => stringsIn(child, depth + 1));
 }
@@ -895,7 +862,7 @@ function stringsIn(value: unknown, depth: number): string[] {
  */
 function reportsFailure(output: string): boolean {
   const parsed = output.trimStart().startsWith("{") ? parseJson(output) : undefined;
-  if (asObject(parsed) !== undefined && !Array.isArray(parsed)) {
+  if (asObject(parsed) !== undefined) {
     const metadata = field(parsed, "metadata");
     const exit = field(metadata, "exit_code") ?? field(parsed, "exit_code");
     const error = field(parsed, "error");
@@ -913,34 +880,6 @@ function reportsFailure(output: string): boolean {
   return /^(?:Script failed|apply_patch verification failed|aborted)/.test(header);
 }
 
-function parseJson(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return undefined;
-  }
-}
-
-function asObject(value: unknown): object | undefined {
-  return typeof value === "object" && value !== null ? value : undefined;
-}
-
-/** Reads an own property of an object, or `undefined` for anything else. */
-function field(value: unknown, key: string): unknown {
-  const object = asObject(value);
-  const descriptor =
-    object === undefined ? undefined : Object.getOwnPropertyDescriptor(object, key);
-  return descriptor === undefined ? undefined : descriptor.value;
-}
-
-function text(value: unknown): string | undefined {
-  return typeof value === "string" ? value : undefined;
-}
-
 function errorCode(error: unknown): unknown {
   return field(error, "code");
-}
-
-function plural(count: number, singular: string, many = `${singular}s`): string {
-  return `${String(count)} ${count === 1 ? singular : many}`;
 }

@@ -28,7 +28,19 @@ import {
   SENSITIVE_FILE_PLACEHOLDER,
 } from "../redaction.ts";
 import type { ReadWorkspaceOptions } from "../workspace.ts";
-import { describeWorkspaceDrift, readWorkspace, WorkspaceError } from "../workspace.ts";
+import { describeWorkspaceDrift } from "../workspace.ts";
+import {
+  asObject,
+  Counter,
+  field,
+  listField,
+  LossLines,
+  plural,
+  readWorkspaceOrFallback,
+  textField,
+  tokensNameSensitiveFile,
+  truncate,
+} from "./common.ts";
 
 /**
  * Options of {@link readClaudeSession}.
@@ -141,32 +153,8 @@ const MAX_LISTED_LINES = 10;
 const PATH_FIELDS = new Set(["file_path", "path", "notebook_path", "filePath"]);
 /** Input fields kept when a tool call touched a sensitive file; every other field is omitted. */
 const KEPT_FIELDS_WHEN_SENSITIVE = new Set([...PATH_FIELDS, "command", "description"]);
-
-// ---------------------------------------------------------------------------------------------
-// Reading unknown JSON without casts
-// ---------------------------------------------------------------------------------------------
-
-/** The value when it is a plain JSON object, else `undefined`. */
-function asObject(value: unknown): object | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value) ? value : undefined;
-}
-
-function field(value: unknown, name: string): unknown {
-  const object = asObject(value);
-  return object !== undefined && Object.hasOwn(object, name)
-    ? Reflect.get(object, name)
-    : undefined;
-}
-
-function textField(value: unknown, name: string): string | undefined {
-  const found = field(value, name);
-  return typeof found === "string" ? found : undefined;
-}
-
-function listField(value: unknown, name: string): readonly unknown[] | undefined {
-  const found = field(value, name);
-  return Array.isArray(found) ? found : undefined;
-}
+/** What splits a shell command into tokens that may name a file. */
+const COMMAND_SEPARATORS = /[\s;|&<>()'"`=]+/;
 
 // ---------------------------------------------------------------------------------------------
 // The records the reader keeps
@@ -218,7 +206,7 @@ interface Scan {
   readonly order: Conversation[];
   readonly results: Map<string, ToolResult>;
   readonly malformedLines: number[];
-  readonly skipped: Map<string, number>;
+  readonly skipped: Counter;
   sidechain: number;
 }
 
@@ -322,10 +310,6 @@ function optional<K extends string, V>(key: K, value: V | undefined): { [P in K]
   return result;
 }
 
-function count(map: Map<string, number>, key: string, by = 1): void {
-  map.set(key, (map.get(key) ?? 0) + by);
-}
-
 /** Reads one line into the scan, or throws on a `continued-in` record. */
 function scanLine(scan: Scan, raw: string, line: number): void {
   if (raw.trim() === "") {
@@ -350,7 +334,7 @@ function scanLine(scan: Scan, raw: string, line: number): void {
   }
   if (type.startsWith("api-request")) {
     // May hold whole API request payloads: nothing but the type is read (#9, #11).
-    count(scan.skipped, type);
+    scan.skipped.add(type);
     return;
   }
   if ((type === "user" || type === "assistant") && field(object, "isSidechain") !== true) {
@@ -361,7 +345,7 @@ function scanLine(scan: Scan, raw: string, line: number): void {
     scan.sidechain += 1;
     return;
   }
-  count(scan.skipped, type);
+  scan.skipped.add(type);
   // Other records with a uuid still link the conversation chain, for example a compaction boundary.
   const uuid = textField(object, "uuid");
   if (uuid !== undefined && field(object, "isSidechain") !== true) {
@@ -390,7 +374,7 @@ async function scanFile(file: string): Promise<Scan> {
     order: [],
     results: new Map(),
     malformedLines: [],
-    skipped: new Map(),
+    skipped: new Counter(),
     sidechain: 0,
   };
   const stream = createReadStream(file, { encoding: "utf8" });
@@ -602,7 +586,7 @@ interface Tally {
   sensitive: number;
   truncated: number;
   summaries: number;
-  readonly nonText: Map<string, number>;
+  readonly nonText: Counter;
   readonly findings: RedactionFinding[][];
 }
 
@@ -613,17 +597,12 @@ function clean(text: string, tally: Tally): string {
 }
 
 /** Cuts text to `limit` characters, never inside a surrogate pair, and says so in the text. */
-function fit(text: string, limit: number): { text: string; cut: boolean } {
-  if (text.length <= limit) {
-    return { text, cut: false };
-  }
-  const note = `\n[truncated: kept ${String(limit)} of ${String(text.length)} characters]`;
-  let kept = text.slice(0, Math.max(0, limit - note.length));
-  const last = kept.codePointAt(kept.length - 1);
-  if (last !== undefined && last >= 0xd8_00 && last <= 0xdb_ff) {
-    kept = kept.slice(0, -1);
-  }
-  return { text: kept + note, cut: true };
+function fit(text: string, limit: number): { readonly text: string; readonly cut: boolean } {
+  return truncate(text, limit, truncationNote);
+}
+
+function truncationNote(limit: number, length: number): string {
+  return `\n[truncated: kept ${String(limit)} of ${String(length)} characters]`;
 }
 
 function fitText(text: string): string {
@@ -644,9 +623,7 @@ function touchesSensitiveFile(input: unknown): boolean {
       return isSensitivePath(value);
     }
     if (key === "command") {
-      return value
-        .split(/[\s;|&<>()'"`=]+/)
-        .some((token) => token !== "" && isSensitivePath(token));
+      return tokensNameSensitiveFile(value, COMMAND_SEPARATORS);
     }
     return false;
   });
@@ -739,7 +716,7 @@ function mapEntries(scan: Scan, chain: Chain, maxToolOutputChars: number): Mappe
     sensitive: 0,
     truncated: 0,
     summaries: 0,
-    nonText: new Map(),
+    nonText: new Counter(),
     findings: [],
   };
   const plan: Plan = { source: undefined, todos: [], tasks: new Map(), created: 0 };
@@ -763,7 +740,7 @@ function mapEntries(scan: Scan, chain: Chain, maxToolOutputChars: number): Mappe
       tally.summaries += 1;
       for (const block of record.blocks) {
         if (block.type !== "text") {
-          count(tally.nonText, block.type === "other" ? block.name : block.type);
+          tally.nonText.add(block.type === "other" ? block.name : block.type);
         }
       }
       const text = record.blocks.flatMap((block) => (block.type === "text" ? [block.text] : []));
@@ -785,7 +762,7 @@ function mapEntries(scan: Scan, chain: Chain, maxToolOutputChars: number): Mappe
           tally.thinking += 1;
           break;
         case "other":
-          count(tally.nonText, block.name);
+          tally.nonText.add(block.name);
           break;
         case "tool_result":
           // Paired with its call below.
@@ -841,7 +818,7 @@ function toolCall(
   maxToolOutputChars: number,
 ): TranscriptEntry {
   for (const kind of result.nonText) {
-    count(tally.nonText, kind);
+    tally.nonText.add(kind);
   }
   const sensitive = touchesSensitiveFile(block.input);
   if (sensitive) {
@@ -867,21 +844,6 @@ function toolCall(
 // Losses
 // ---------------------------------------------------------------------------------------------
 
-function plural(n: number, one: string, many = `${one}s`): string {
-  return `${String(n)} ${n === 1 ? one : many}`;
-}
-
-function breakdown(map: ReadonlyMap<string, number>): string {
-  return [...map]
-    .toSorted(([a], [b]) => a.localeCompare(b))
-    .map(([name, n]) => `${name} ${String(n)}`)
-    .join(", ");
-}
-
-function total(map: ReadonlyMap<string, number>): number {
-  return [...map.values()].reduce((sum, n) => sum + n, 0);
-}
-
 function lossLines(
   scan: Scan,
   chain: Chain,
@@ -890,15 +852,10 @@ function lossLines(
   maxToolOutputChars: number,
 ): string[] {
   const { tally } = mapped;
-  const lines: string[] = [];
-  const add = (n: number, line: string): void => {
-    if (n > 0) {
-      lines.push(line);
-    }
-  };
+  const lines = new LossLines();
   const malformed = scan.malformedLines;
   const listed = malformed.slice(0, MAX_LISTED_LINES).map(String).join(", ");
-  add(
+  lines.add(
     malformed.length,
     `skipped ${plural(malformed.length, "malformed line")} (line ${listed}${malformed.length > MAX_LISTED_LINES ? ", …" : ""})`,
   );
@@ -914,36 +871,36 @@ function lossLines(
         : `replaced ${plural(chain.replacedTurns, "earlier turn")} with Claude Code's compaction summary`,
     );
   }
-  add(
+  lines.add(
     chain.abandoned,
     `dropped ${plural(chain.abandoned, "record")} from rewound or abandoned branches`,
   );
-  add(
+  lines.add(
     tally.thinking,
     `dropped ${plural(tally.thinking, "thinking block")}: signed reasoning cannot move between vendors`,
   );
-  add(
-    total(tally.nonText),
-    `dropped ${plural(total(tally.nonText), "non-text block")} (${breakdown(tally.nonText)})`,
+  lines.add(
+    tally.nonText.total(),
+    `dropped ${plural(tally.nonText.total(), "non-text block")} (${tally.nonText.describe()})`,
   );
-  add(tally.meta, `dropped ${plural(tally.meta, "hidden meta message")}`);
-  add(tally.noResult, `dropped ${plural(tally.noResult, "tool call")} with no result`);
-  add(scan.sidechain, `dropped ${plural(scan.sidechain, "sidechain record")}`);
-  add(subagents, `dropped ${plural(subagents, "subagent transcript")}`);
-  add(
-    total(scan.skipped),
-    `dropped ${plural(total(scan.skipped), "non-conversation record")} (${breakdown(scan.skipped)})`,
+  lines.add(tally.meta, `dropped ${plural(tally.meta, "hidden meta message")}`);
+  lines.add(tally.noResult, `dropped ${plural(tally.noResult, "tool call")} with no result`);
+  lines.add(scan.sidechain, `dropped ${plural(scan.sidechain, "sidechain record")}`);
+  lines.add(subagents, `dropped ${plural(subagents, "subagent transcript")}`);
+  lines.add(
+    scan.skipped.total(),
+    `dropped ${plural(scan.skipped.total(), "non-conversation record")} (${scan.skipped.describe()})`,
   );
-  add(
+  lines.add(
     tally.sensitive,
     `omitted the output of ${plural(tally.sensitive, "tool call")} that named a sensitive file`,
   );
-  add(
+  lines.add(
     tally.truncated,
     `truncated the output of ${plural(tally.truncated, "tool call")} to ${String(maxToolOutputChars)} characters`,
   );
   lines.push(...redactionLosses(tally.findings.flat()));
-  return lines;
+  return lines.lines;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -965,20 +922,19 @@ async function workspaceOf(
   const recorded = last.gitBranch;
   const branch =
     recorded === undefined || recorded === "" || recorded === "HEAD" ? {} : { branch: recorded };
-  try {
-    const workspace = await readWorkspace(last.cwd, options);
-    return { workspace, losses: describeWorkspaceDrift(branch, workspace) };
-  } catch (error) {
-    if (error instanceof WorkspaceError && error.code === "cwd-not-found") {
-      return {
-        workspace: { cwd: path.resolve(last.cwd), ...branch, dirty: false },
-        losses: [
+  const { workspace, missing } = await readWorkspaceOrFallback(last.cwd, options, {
+    cwd: path.resolve(last.cwd),
+    ...branch,
+    dirty: false,
+  });
+  return {
+    workspace,
+    losses: missing
+      ? [
           "the session's directory no longer exists: the branch is as recorded, the commit and dirty state are unknown",
-        ],
-      };
-    }
-    throw error;
-  }
+        ]
+      : describeWorkspaceDrift(branch, workspace),
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
