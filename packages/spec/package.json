@@ -1,7 +1,7 @@
 {
   "name": "@acp-ferry/spec",
   "version": "0.0.0",
-  "private": false,
+  "private": true,
   "description": "Draft types and pure helpers for an Agent Client Protocol (ACP) extension: cross-agent delegation, messaging, session portability and routing. Runs in any JavaScript runtime.",
   "keywords": [
     "agent-client-protocol",
