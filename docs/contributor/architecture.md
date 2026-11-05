@@ -16,7 +16,8 @@ natively.
 | `@acp-ferry/broker` | Broker core, ACP driver, MCP server, session export and import, routing              | Node           | Started |
 | `@acp-ferry/cli`    | The `acp-ferry` command (R-DX-2)                                                     | Node           | Planned |
 
-`packages/broker` has the workspace state reader (`workspace.ts`, R-PORT-4) and depends on
+`packages/broker` has the workspace state reader (`workspace.ts`, R-PORT-4), pattern-based
+redaction (`redaction.ts`, R-SEC-4; pure, so it can move to `packages/spec`) and depends on
 `@acp-ferry/spec` for the types. Whether the MCP server and the CLI become separate
 packages is decided when M2 starts.
 

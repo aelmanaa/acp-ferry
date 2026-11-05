@@ -7,7 +7,7 @@ machine, with a choice of model.
 Status: in design; nothing is published to npm yet. The repository has the toolchain, a typed draft
 contract (`packages/spec/src/types.ts`), identifier parsers, the `SessionExport` JSON Schema and
 validator, the plan, and the first broker code:
-the workspace state reader for session exports.
+the workspace state reader and credential redaction for session exports.
 
 ## Start here
 
@@ -35,6 +35,8 @@ User docs live in [docs/user/](docs/user/README.md); the index for people is
 
 - [docs/user/reference/workspace-state.md](docs/user/reference/workspace-state.md): `readWorkspace`,
   its options and error codes, and `describeWorkspaceDrift`.
+- [docs/user/reference/redaction.md](docs/user/reference/redaction.md): `redact`, the redaction
+  kinds, `isSensitivePath` and the `losses` line.
 
 ## Commands
 
@@ -55,7 +57,7 @@ natively. pnpm 12.16.1 (`packageManager`).
 | Path                    | Contents                                                                                                                                                    |
 | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/spec/src/`    | Draft types, identifier parsers and the `SessionExport` validator. Runtime-neutral: no Node built-ins (lint rule and a build without Node types enforce it) |
-| `packages/broker/src/`  | The broker. Node-only. Today: the workspace state reader (`workspace.ts`)                                                                                   |
+| `packages/broker/src/`  | The broker. Node-only. Today: the workspace state reader (`workspace.ts`) and redaction (`redaction.ts`)                                                    |
 | `packages/*/test/unit/` | Unit tests, `*.test.ts`                                                                                                                                     |
 | `scripts/`              | Repository scripts run with plain `node`: git hooks, type-escape check, test runner                                                                         |
 | `docs/user/`            | User documentation (written as features land)                                                                                                               |

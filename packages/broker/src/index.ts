@@ -21,3 +21,12 @@ export type {
   RecordedWorkspace,
   WorkspaceErrorCode,
 } from "./workspace.ts";
+
+export {
+  isSensitivePath,
+  mergeRedactionFindings,
+  redact,
+  redactionLosses,
+  SENSITIVE_FILE_PLACEHOLDER,
+} from "./redaction.ts";
+export type { RedactionFinding, RedactionKind, RedactionResult } from "./redaction.ts";
