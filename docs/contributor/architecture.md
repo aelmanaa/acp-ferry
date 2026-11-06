@@ -107,7 +107,9 @@ sequenceDiagram
 ```
 
 Moving back appends only the turns added in the target, after checking that the source history is
-an exact prefix (R-PORT-6).
+an exact prefix (R-PORT-6). In M1, `handBack` checks that the source session still has exactly the
+entries and digest recorded at handoff, then resumes it over ACP and sends one prompt with the new
+turns. Any difference fails closed. Merging diverged histories is out of scope.
 
 ## Extension points
 

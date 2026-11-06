@@ -40,10 +40,15 @@ export type { ClaudeReaderErrorCode, ReadClaudeSessionOptions } from "./readers/
 export {
   formatHandoffMarker,
   parseHandoffMarker,
+  renderHandBackPrompt,
   renderSeedPrompt,
   SEED_PROMPT_DEFAULTS,
 } from "./handoff/render.ts";
-export type { RenderSeedPromptOptions, SeedPrompt } from "./handoff/render.ts";
+export type {
+  RenderHandBackPromptOptions,
+  RenderSeedPromptOptions,
+  SeedPrompt,
+} from "./handoff/render.ts";
 
 export { AcpAgent, startAgent } from "./acp/client.ts";
 export type {
@@ -80,5 +85,19 @@ export type {
   HandOffSource,
   HandOffTarget,
 } from "./handoff/handoff.ts";
+export { handBack, HandBackError } from "./handoff/handback.ts";
+export type {
+  HandBackErrorCode,
+  HandBackOptions,
+  HandBackOriginal,
+  HandBackResult,
+  HandBackSession,
+} from "./handoff/handback.ts";
 export { appendLedgerEntry, LEDGER_FILE, readLedger } from "./handoff/ledger.ts";
-export type { HandoffLedgerEntry, LedgerContents } from "./handoff/ledger.ts";
+export type {
+  HandBackMethod,
+  HandbackLedgerEntry,
+  HandoffLedgerEntry,
+  LedgerContents,
+  LedgerEntry,
+} from "./handoff/ledger.ts";

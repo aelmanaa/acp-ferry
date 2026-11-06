@@ -10,6 +10,7 @@ import {
   parseModelId,
   parseSessionAddress,
   parseSessionExport,
+  SESSION_DIGEST_PATTERN,
   SESSION_EXPORT_LIMITS,
   sessionExportSchema,
 } from "../../src/index.ts";
@@ -71,9 +72,22 @@ const minimal = {
 
 const user = (text: string): SessionExport["entries"][number] => ({ kind: "user", text });
 
+const basis = {
+  address: "acp://localhost/claude-acp/0f8e1c2a",
+  entries: 5,
+  digest: `sha256:${"0a".repeat(32)}`,
+} satisfies SessionExport["basis"];
+const withBasis = { ...valid, basis } satisfies SessionExport;
+
 /** Documents that both validators must accept. */
 const accepted: ReadonlyArray<readonly [string, unknown]> = [
   ["a full export", valid],
+  ["an export with a basis (R-PORT-6)", withBasis],
+  ["a basis of zero entries", { ...valid, basis: { ...basis, entries: 0 } }],
+  [
+    "a basis at the entry limit",
+    { ...valid, basis: { ...basis, entries: SESSION_EXPORT_LIMITS.maxEntries } },
+  ],
   ["a minimal export with a leap second", minimal],
   ["a lowercase t and z", { ...valid, exportedAt: "2026-11-05t10:15:30z" }],
   ["a positive offset", { ...valid, exportedAt: "2026-11-05T12:15:30+02:00" }],
@@ -124,7 +138,36 @@ const rejected: ReadonlyArray<readonly [string, unknown, string]> = [
   ["a version string", { ...valid, version: "0" }, "version"],
   ["missing losses", withoutKey(valid, "losses"), "losses"],
   ["missing source", withoutKey(valid, "source"), "source"],
-  ["an extra top-level field", { ...valid, basis: "abc" }, "basis"],
+  ["an extra top-level field", { ...valid, extra: "abc" }, "extra"],
+  ["a basis that is not an object", { ...valid, basis: SECRET }, "basis"],
+  ["a basis without a digest", { ...valid, basis: withoutKey(basis, "digest") }, "basis.digest"],
+  ["a basis with an extra field", { ...valid, basis: { ...basis, text: SECRET } }, "basis.text"],
+  [
+    "a basis with a bad address",
+    { ...valid, basis: { ...basis, address: `http://x/${SECRET}` } },
+    "basis.address",
+  ],
+  [
+    "a basis address that is not a string",
+    { ...valid, basis: { ...basis, address: 7 } },
+    "basis.address",
+  ],
+  ["a negative basis count", { ...valid, basis: { ...basis, entries: -1 } }, "basis.entries"],
+  ["a fractional basis count", { ...valid, basis: { ...basis, entries: 2.5 } }, "basis.entries"],
+  [
+    "a basis count over the entry limit",
+    { ...valid, basis: { ...basis, entries: SESSION_EXPORT_LIMITS.maxEntries + 1 } },
+    "basis.entries",
+  ],
+  ["a basis count as a string", { ...valid, basis: { ...basis, entries: "5" } }, "basis.entries"],
+  [
+    "an uppercase digest",
+    { ...valid, basis: { ...basis, digest: `sha256:${"0A".repeat(32)}` } },
+    "basis.digest",
+  ],
+  ["a short digest", { ...valid, basis: { ...basis, digest: "sha256:00" } }, "basis.digest"],
+  ["a digest of another kind", { ...valid, basis: { ...basis, digest: SECRET } }, "basis.digest"],
+  ["a digest that is not a string", { ...valid, basis: { ...basis, digest: 0 } }, "basis.digest"],
   ["an extra field with an unprintable name", { ...valid, [SECRET]: 1 }, "(root)"],
   ["source not an object", { ...valid, source: SECRET }, "source"],
   [
@@ -329,6 +372,13 @@ describe("parseSessionExport (R-PORT-1)", () => {
     assert.notEqual(result.value.workspace, valid.workspace);
   });
 
+  it("keeps the basis of a document that has one (R-PORT-6)", () => {
+    assert.deepEqual(parseSessionExport(JSON.parse(JSON.stringify(withBasis))), {
+      ok: true,
+      value: withBasis,
+    });
+  });
+
   it("accepts a document read back from JSON", () => {
     assert.deepEqual(parseSessionExport(JSON.parse(JSON.stringify(valid))), {
       ok: true,
@@ -420,6 +470,11 @@ describe("sessionExportSchema", () => {
       SESSION_EXPORT_LIMITS.maxFieldLength,
     );
     assert.equal(properties.exportedAt.maxLength, SESSION_EXPORT_LIMITS.maxFieldLength);
+    assert.equal(properties.basis.properties.entries.maximum, SESSION_EXPORT_LIMITS.maxEntries);
+    assert.equal(
+      properties.basis.properties.address.maxLength,
+      SESSION_EXPORT_LIMITS.maxFieldLength,
+    );
   });
 
   it("uses the identifier patterns of identifiers.ts", () => {
@@ -428,6 +483,14 @@ describe("sessionExportSchema", () => {
       SESSION_ADDRESS_PATTERN,
     );
     assert.equal(sessionExportSchema.properties.source.properties.model.pattern, MODEL_ID_PATTERN);
+    assert.equal(
+      sessionExportSchema.properties.basis.properties.address.pattern,
+      SESSION_ADDRESS_PATTERN,
+    );
+    assert.equal(
+      sessionExportSchema.properties.basis.properties.digest.pattern,
+      SESSION_DIGEST_PATTERN,
+    );
   });
 
   it("gives the same accept or reject result as parseSessionExport on the whole corpus (R-PORT-1)", () => {

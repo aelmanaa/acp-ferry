@@ -7,10 +7,9 @@
  * transcript text: errors name agents, ids, paths and codes (R-SEC-4, R-DX-3).
  */
 import { randomUUID } from "node:crypto";
-import { stat } from "node:fs/promises";
 import path from "node:path";
 
-import { formatSessionAddress, parseSessionExport } from "@acp-ferry/spec";
+import { computeSessionBasis, formatSessionAddress, parseSessionExport } from "@acp-ferry/spec";
 import type { HandoffMode, SessionAddressString, SessionExport } from "@acp-ferry/spec";
 
 import { startAgent } from "../acp/client.ts";
@@ -24,6 +23,7 @@ import { appendLedgerEntry, writePrivateFile } from "./ledger.ts";
 import type { HandoffLedgerEntry } from "./ledger.ts";
 import { renderSeedPrompt } from "./render.ts";
 import type { RenderSeedPromptOptions } from "./render.ts";
+import { codePoints, hintOf, isDirectory, messageOf } from "./shared.ts";
 
 /**
  * The session to hand off.
@@ -225,7 +225,8 @@ const EXPORTS_DIRECTORY = "exports";
  * 3. Starts the target adapter in that directory with every permission request denied (R-SEC-2),
  *    opens a session there (`session/new`) and sets the model when one is given (R-ID-2).
  * 4. Sends the seed prompt, with a new handoff id in its marker line, and waits for the reply.
- * 5. Writes the export to `<stateDir>/exports/<handoffId>.json` and appends a line to
+ * 5. Writes the export, with the source `basis` (entry count and digest of the full reading, for
+ *    `handBack`), to `<stateDir>/exports/<handoffId>.json` and appends a line to
  *    `<stateDir>/ledger.jsonl`, both mode `0600`.
  * 6. Closes the target adapter unless `keepAgent` is set.
  *
@@ -261,6 +262,8 @@ export async function handOff(options: HandOffOptions): Promise<HandOffResult> {
 
   const doc = await readSource(options, host, now(), source.read);
   await assertDirectory(doc.workspace.cwd);
+  // Over the full reading, before the mode shortens anything (R-PORT-6).
+  const basis = await computeSessionBasis(doc.source.address, doc.entries);
 
   const handoffId = (options.newHandoffId ?? randomUUID)();
   const seed = renderSeedPrompt(doc, { ...options.seed, handoffId, mode });
@@ -311,12 +314,13 @@ export async function handOff(options: HandOffOptions): Promise<HandOffResult> {
       exportFile: path.posix.join(EXPORTS_DIRECTORY, `${handoffId}.json`),
       exportedAt: doc.exportedAt,
       sourceEntries: doc.entries.length,
+      sourceBasis: basis,
       seedCharacters: codePoints(seed.text),
     };
     const ledgerFile = await recordHandoff(
       options.stateDir,
       exportFile,
-      { ...doc, handoff: mode },
+      { ...doc, basis, handoff: mode },
       entry,
     );
     if (options.keepAgent !== true) {
@@ -393,11 +397,7 @@ async function readSource(
 }
 
 async function assertDirectory(cwd: string): Promise<void> {
-  const found = await stat(cwd).then(
-    (info) => info.isDirectory(),
-    () => false,
-  );
-  if (!found) {
+  if (!(await isDirectory(cwd))) {
     throw new HandOffError(
       "cwd-not-found",
       `the session's workspace ${cwd} is not a directory on this machine`,
@@ -498,20 +498,4 @@ async function recordHandoff(
       { cause: error },
     );
   }
-}
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-/** The hint of an error that has one (the broker's typed errors), else `fallback`. */
-function hintOf(error: unknown, fallback: string): string {
-  if (error instanceof Error && "hint" in error && typeof error.hint === "string") {
-    return error.hint;
-  }
-  return fallback;
-}
-
-function codePoints(text: string): number {
-  return Array.from(text).length;
 }

@@ -119,6 +119,16 @@ is a prompt-injection path. The seed prompt reduces the risk; it does not remove
 
 The import session should also run with permissions denied.
 
+## Hand-back prompt
+
+`renderHandBackPrompt(turns, { handoffId, maxToolTextCharacters? })` renders the prompt that
+`handBack` sends to the original session (R-PORT-6). `turns` is the moved session's export with
+`entries` cut to the new entries. The prompt has the same parts as a `full-transcript` seed prompt:
+a new marker line, the moved session's address, model and workspace, the plan, the losses, and the
+new entries in a fenced, redacted history block. The header says the history holds only the entries
+added after the session was moved. It has no character budget, so no new entry is left out; tool
+text is still cut to `maxToolTextCharacters`. Entries are numbered from 1 within the new entries.
+
 ## Redaction
 
 The renderer never adds back what [redaction](redaction.md) replaced. It also runs `redact` again
