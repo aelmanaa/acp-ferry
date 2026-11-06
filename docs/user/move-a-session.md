@@ -11,6 +11,62 @@ session in the target agent's own interface and keep working.
 
 M1 runs this through an example script. There is no command-line tool yet.
 
+## Find your session ids
+
+`--session` takes the full Claude Code session id or Codex thread id. Neither agent shows ids next
+to session titles, so read them from the agents' own files. Run these commands from the project
+directory. They work in bash and zsh and need `jq`. `command ls` skips a shell alias or function
+named `ls`.
+
+Claude Code keeps one file per session, `<id>.jsonl`, in a directory named after the working
+directory with symlinks resolved and every character other than a letter or digit replaced by `-`.
+The latest sessions for the current directory, most recently used first:
+
+```bash
+dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects/$(pwd -P | sed 's/[^A-Za-z0-9]/-/g')"
+command ls -t "$dir"/*.jsonl | head -5 | xargs -n1 basename | sed 's/\.jsonl$//'
+```
+
+The title of one session. A title set with `/rename` wins over the generated one:
+
+```bash
+jq -r 'select(.type=="custom-title" or .type=="ai-title") | .customTitle // .aiTitle' \
+  "$dir/<id>.jsonl" | tail -1
+```
+
+Codex keeps one rollout file per thread under `sessions/<year>/<month>/<day>/`, and the thread id is
+the UUID at the end of its file name. The latest threads for the current directory, most recently
+used first, with the time each one started:
+
+```bash
+for f in $(command ls -t "${CODEX_HOME:-$HOME/.codex}"/sessions/*/*/*/rollout-*.jsonl | head -20); do
+  head -1 "$f" | jq -r --arg cwd "$(pwd -P)" \
+    'select(.payload.cwd==$cwd) | [.payload.id, .payload.timestamp] | @tsv'
+done
+```
+
+The first line of a rollout file holds account ids and the full system instructions. Select fields
+with `jq` as above; do not print or paste the whole line.
+
+Threads you named have an entry in `session_index.jsonl`. The file is append-only, so when a thread
+was renamed, its last line holds the current name:
+
+```bash
+jq -r '[.id, .thread_name] | @tsv' "${CODEX_HOME:-$HOME/.codex}/session_index.jsonl"
+```
+
+Both agents also open a session without its id:
+
+| Open                      | Claude Code              | Codex                 |
+| ------------------------- | ------------------------ | --------------------- |
+| A session by id or name   | `claude --resume <name>` | `codex resume <name>` |
+| The latest in this folder | `claude --continue`      | `codex resume --last` |
+| A picker                  | `claude --resume`        | `codex resume`        |
+
+You need the id only for the first handoff. The handoff prints the new session's address on the
+`to` line, which ends with its id, and the command that opens it, such as `codex resume <id>`. Use
+that id as `--session` with `--back`.
+
 ## Run it
 
 From a clone of the repository, with Node 22.18 or later:
@@ -23,19 +79,16 @@ node packages/broker/examples/hand-off.ts \
   --to codex-acp --mode summary+recent --model openai/gpt-5.5
 ```
 
-| Option              | Default                     | What it does                                                         |
-| ------------------- | --------------------------- | -------------------------------------------------------------------- |
-| `--from`            | Required                    | The source agent: `claude-acp` or `codex-acp`                        |
-| `--session`         | Required                    | The Claude Code session id, or the Codex thread id                   |
-| `--to`              | Required                    | The target agent: `claude-acp` or `codex-acp`                        |
-| `--mode`            | `summary+recent`            | How much history moves: `summary+recent` or `full-transcript`        |
-| `--model`           | The agent's default         | An option value or a `provider/model` id, such as `anthropic/opus`   |
-| `--state-dir`       | `$XDG_STATE_HOME/acp-ferry` | Where the ledger and the export files go                             |
-| `--env NAME`        | None                        | Pass one more environment variable to the target adapter. Repeatable |
-| `--command`/`--arg` | The pinned adapter          | Start a different adapter build instead                              |
-
-The Claude Code session id is the name of its file under `~/.claude/projects/` without `.jsonl`.
-The Codex thread id is the UUID that `codex resume` lists.
+| Option              | Default                     | What it does                                                                     |
+| ------------------- | --------------------------- | -------------------------------------------------------------------------------- |
+| `--from`            | Required                    | The source agent: `claude-acp` or `codex-acp`                                    |
+| `--session`         | Required                    | The Claude Code session id or Codex thread id: [find it](#find-your-session-ids) |
+| `--to`              | Required                    | The target agent: `claude-acp` or `codex-acp`                                    |
+| `--mode`            | `summary+recent`            | How much history moves: `summary+recent` or `full-transcript`                    |
+| `--model`           | The agent's default         | An option value or a `provider/model` id, such as `anthropic/opus`               |
+| `--state-dir`       | `$XDG_STATE_HOME/acp-ferry` | Where the ledger and the export files go                                         |
+| `--env NAME`        | None                        | Pass one more environment variable to the target adapter. Repeatable             |
+| `--command`/`--arg` | The pinned adapter          | Start a different adapter build instead                                          |
 
 The script reads the source session from `CLAUDE_CONFIG_DIR` (default `~/.claude`) or `CODEX_HOME`
 (default `~/.codex`). It starts the target adapter with `npx`: `@agentclientprotocol/codex-acp@2.5.0`
