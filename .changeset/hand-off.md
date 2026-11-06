@@ -1,0 +1,5 @@
+---
+"@acp-ferry/broker": minor
+---
+
+Add `handOff`, which hands a Claude Code or Codex session to the other agent over ACP. It reads the session, checks the export, starts the target adapter in the same workspace, opens a session, sets the model when you pass one, and sends the seed prompt in `summary+recent` or `full-transcript` mode. The seed prompt runs with every permission request denied. It refuses a workspace that does not exist on this machine before any agent starts. On success it writes the export and appends a line to the handoff ledger in the state directory you pass, both with mode `0600`, and returns the new session address, the losses and the command that opens the session in the target agent. A failed handoff stops the adapter and writes nothing. Errors are a `HandOffError` with a stable `code` and a `hint`. Add `HANDOFF_AGENTS`, `toHandoffAgentId`, `readLedger` and `appendLedgerEntry`, and the example script `examples/hand-off.ts`. ([#15](https://github.com/aelmanaa/acp-ferry/issues/15))
