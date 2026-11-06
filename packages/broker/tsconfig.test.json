@@ -6,6 +6,6 @@
     "outDir": "../../node_modules/.cache/tsbuild/broker-test",
     "tsBuildInfoFile": "../../node_modules/.cache/tsbuild/broker-test.tsbuildinfo"
   },
-  "include": ["src", "test"],
+  "include": ["src", "test", "examples"],
   "references": [{ "path": "../spec/tsconfig.build.json" }]
 }

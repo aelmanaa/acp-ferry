@@ -16,6 +16,8 @@ Pages so far:
   agent, in both handoff modes.
 - [ACP client](reference/acp-client.md): start an ACP agent, open or load a session, choose a model
   and send a prompt.
+- [Move a session](move-a-session.md): hand a Claude Code or Codex session to the other agent,
+  what moves and what is lost, and how to open the new session.
 
 Pages land with the features they describe, in four kinds (the Diátaxis layout):
 

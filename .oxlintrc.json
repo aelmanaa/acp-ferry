@@ -126,6 +126,14 @@
       }
     },
     {
+      "files": ["packages/*/examples/**"],
+      "rules": {
+        "eslint/no-console": "off",
+        "jsdoc-js/require-jsdoc": "off",
+        "node/no-process-env": "off"
+      }
+    },
+    {
       "files": ["test/**"],
       "rules": {
         "jsdoc-js/require-jsdoc": "off",

@@ -69,3 +69,16 @@ export type {
   PermissionPolicy,
   PermissionRequest,
 } from "./acp/permissions.ts";
+
+export { HANDOFF_AGENTS, toHandoffAgentId } from "./handoff/agents.ts";
+export type { HandoffAgent, HandoffAgentId, HandoffReadRequest } from "./handoff/agents.ts";
+export { handOff, HandOffError } from "./handoff/handoff.ts";
+export type {
+  HandOffErrorCode,
+  HandOffOptions,
+  HandOffResult,
+  HandOffSource,
+  HandOffTarget,
+} from "./handoff/handoff.ts";
+export { appendLedgerEntry, LEDGER_FILE, readLedger } from "./handoff/ledger.ts";
+export type { HandoffLedgerEntry, LedgerContents } from "./handoff/ledger.ts";
