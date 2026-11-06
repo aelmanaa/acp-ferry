@@ -78,6 +78,12 @@ it seeds an agent with it.
 | Text (transcript text, tool input and output, plan, losses) | 1,000,000 |
 | Names, paths, address, model id, timestamp                  | 4,096     |
 
+An export may carry a `basis`: the source address, the number of transcript entries read, and a
+SHA-256 digest of those entries (`sha256:` and 64 lowercase hex digits). `digestEntries` in
+`@acp-ferry/spec` computes it with Web Crypto over the UTF-8 bytes of `JSON.stringify` of the
+entries, each with its fields in a fixed order. A round trip compares the basis with a new reading
+of the source before it appends anything (R-PORT-6).
+
 Lengths count Unicode code points. Every object rejects unknown fields, so a document from a newer
 writer fails with the path of the new field. The unit tests check that Ajv with the schema and
 `parseSessionExport` accept and reject the same documents. Two differences remain outside that

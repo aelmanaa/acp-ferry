@@ -15,7 +15,7 @@ import path from "node:path";
 import { after, before, describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
-import { parseSessionExport } from "@acp-ferry/spec";
+import { computeSessionBasis, parseSessionExport } from "@acp-ferry/spec";
 import type { HandoffMode } from "@acp-ferry/spec";
 
 import {
@@ -354,6 +354,11 @@ describe("handOff", () => {
 
       const [line, ...rest] = ledgerLines(stateDir);
       assert.equal(rest.length, 0);
+      const parsed = parseSessionExport(JSON.parse(readFileSync(result.exportFile, "utf8")));
+      assert.ok(parsed.ok);
+      const exported = parsed.value;
+      const basis = await computeSessionBasis(result.source, exported.entries);
+      assert.deepEqual(exported.basis, basis, "the export holds the basis (R-PORT-6)");
       const entry: HandoffLedgerEntry = {
         kind: "handoff",
         version: 0,
@@ -367,7 +372,8 @@ describe("handOff", () => {
         marker: `acp-ferry handoff ${HANDOFF_ID}`,
         exportFile: `exports/${HANDOFF_ID}.json`,
         exportedAt: NOW.toISOString(),
-        sourceEntries: JSON.parse(readFileSync(result.exportFile, "utf8")).entries.length,
+        sourceEntries: exported.entries.length,
+        sourceBasis: basis,
         seedCharacters: result.seedCharacters,
       };
       assert.deepEqual(JSON.parse(line ?? ""), entry);
@@ -644,7 +650,9 @@ describe("the ledger", () => {
       entries.map((item) => item.handoffId),
       [HANDOFF_ID, "second"],
     );
-    assert.equal(entries[1]?.targetModel, "big");
+    const second = entries[1];
+    assert.ok(second?.kind === "handoff");
+    assert.equal(second.targetModel, "big");
   });
 
   it("lists invalid lines by number and keeps the valid ones", async () => {

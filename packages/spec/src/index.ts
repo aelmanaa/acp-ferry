@@ -5,6 +5,7 @@ export {
   parseModelId,
   parseSessionAddress,
 } from "./identifiers.ts";
+export { computeSessionBasis, digestEntries, SESSION_DIGEST_PATTERN } from "./basis.ts";
 export {
   parseSessionExport,
   SESSION_EXPORT_LIMITS,
@@ -26,7 +27,9 @@ export type {
   RoutingPolicy,
   SessionAddress,
   SessionAddressString,
+  SessionBasis,
   SessionDescriptor,
+  SessionDigest,
   SessionExport,
   SessionMessage,
   SessionState,

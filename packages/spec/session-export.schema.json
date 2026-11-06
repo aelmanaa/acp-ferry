@@ -43,6 +43,31 @@
         }
       }
     },
+    "basis": {
+      "description": "The source session as it was read, for the prefix check of a round trip (R-PORT-6).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["address", "entries", "digest"],
+      "properties": {
+        "address": {
+          "description": "The session address that was read.",
+          "type": "string",
+          "maxLength": 4096,
+          "pattern": "^acp://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?/[a-z0-9][a-z0-9._-]*/(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+$"
+        },
+        "entries": {
+          "description": "How many transcript entries the digest covers.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "digest": {
+          "description": "SHA-256 of the canonical JSON of those entries.",
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
     "exportedAt": {
       "description": "When the session was exported, as an RFC 3339 timestamp.",
       "type": "string",

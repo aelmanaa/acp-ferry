@@ -11,10 +11,17 @@
 //   { "type": "send", "message": {...} }  writes a message; a response gets the id of the request it
 //                                         answers, as the client numbered it
 //   { "type": "exit", "code": n }         exits at once
+//   { "type": "append", "file": "...", "lines": [...] }
+//                                         appends each line as JSON to the file, as an agent writes
+//                                         its transcript; the string "$PROMPT" in a line becomes the
+//                                         text of the last session/prompt received
+//   { "type": "chmod", "file": "...", "mode": n }
+//                                         changes the mode of a file, to make it unreadable or
+//                                         read-only part way through
 // The log gets one JSON line per event: the environment keys at start, each message received, the
 // pid of a grandchild, and any mismatch (after which the agent exits with code 2).
 import { spawn } from "node:child_process";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, chmodSync, readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 
 const [scriptPath, logPath] = process.argv.slice(2);
@@ -103,11 +110,31 @@ function fail(expected: unknown, got: unknown): never {
 
 // Recorded id of a client request -> the id the client used.
 const ids = new Map<unknown, unknown>();
+let lastPrompt = "";
+
+function promptText(message: Json): string {
+  const params = isJson(message.params) ? message.params : {};
+  const parts = Array.isArray(params.prompt) ? params.prompt : [];
+  const first: unknown = parts[0];
+  return isJson(first) && typeof first.text === "string" ? first.text : "";
+}
+
+function fill(value: unknown): unknown {
+  if (value === "$PROMPT") return lastPrompt;
+  if (Array.isArray(value)) return value.map(fill);
+  if (isJson(value)) return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fill(v)]));
+  return value;
+}
 
 for (const step of steps) {
   const message = isJson(step.message) ? step.message : undefined;
   if (step.type === "exit") {
     process.exit(typeof step.code === "number" ? step.code : 1);
+  } else if (step.type === "append" && typeof step.file === "string") {
+    const appended = Array.isArray(step.lines) ? step.lines : [];
+    appendFileSync(step.file, appended.map((line) => `${JSON.stringify(fill(line))}\n`).join(""));
+  } else if (step.type === "chmod" && typeof step.file === "string") {
+    chmodSync(step.file, typeof step.mode === "number" ? step.mode : 0);
   } else if (step.type === "recv") {
     const got = await next();
     if (got === undefined) {
@@ -115,6 +142,7 @@ for (const step of steps) {
       break;
     }
     log({ type: "recv", message: got });
+    if (got.method === "session/prompt") lastPrompt = promptText(got);
     if (message?.method !== undefined) {
       if (got.method !== message.method) fail(message.method, got.method);
       if ("id" in message) ids.set(message.id, got.id);

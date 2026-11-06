@@ -14,7 +14,7 @@ User documentation is written as features land: [user/README.md](user/README.md)
 | [Claude Code session reader](user/reference/claude-reader.md) | Turning a Claude Code transcript into a session export       |
 | [Seed prompt](user/reference/seed-prompt.md)                  | The prompt that starts a moved session in the target agent   |
 | [ACP client](user/reference/acp-client.md)                    | Start an ACP agent, open a session, choose a model, prompt   |
-| [Move a session](user/move-a-session.md)                      | Hand a session to another agent and continue there           |
+| [Move a session](user/move-a-session.md)                      | Hand a session to another agent, continue, and move it back  |
 
 ## Contributors
 

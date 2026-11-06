@@ -352,6 +352,30 @@ export interface WorkspaceRef {
 }
 
 /**
+ * A SHA-256 digest of transcript entries: `sha256:` and 64 lowercase hexadecimal digits. See
+ * `digestEntries` for the bytes it covers.
+ *
+ * @experimental
+ */
+export type SessionDigest = `sha256:${string}`;
+
+/**
+ * What a session held when it was read, so that a later read can check that it has not changed
+ * (R-PORT-6). The digest covers the first `entries` transcript entries of the full reading, before
+ * a handoff mode shortens anything.
+ *
+ * @experimental
+ */
+export interface SessionBasis {
+  /** The session that was read. */
+  readonly address: SessionAddressString;
+  /** How many transcript entries the digest covers. */
+  readonly entries: number;
+  /** The digest of those entries. */
+  readonly digest: SessionDigest;
+}
+
+/**
  * A neutral, agent-independent copy of a session, produced by `session/export` and read by
  * `session/import` (R-PORT-1). Version 0 is a draft.
  *
@@ -367,6 +391,11 @@ export interface SessionExport {
     readonly address: SessionAddressString;
     readonly model?: ModelId;
   };
+  /**
+   * The source session as it was read, for the prefix check of a round trip (R-PORT-6). A handoff
+   * sets it; an export without it cannot be moved back.
+   */
+  readonly basis?: SessionBasis;
   /** When it was exported, as an ISO 8601 timestamp. */
   readonly exportedAt: string;
   /** How much history it carries. */

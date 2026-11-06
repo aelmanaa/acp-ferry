@@ -6,12 +6,15 @@
  * document, and the unit tests check that the two match and that Ajv and
  * {@link parseSessionExport} accept and reject the same documents.
  */
+import { SESSION_DIGEST_PATTERN } from "./basis.ts";
 import { MODEL_ID_PATTERN, SESSION_ADDRESS_PATTERN } from "./identifiers.ts";
 import type {
   HandoffMode,
   ModelId,
   ParseResult,
   SessionAddressString,
+  SessionBasis,
+  SessionDigest,
   SessionExport,
   TranscriptEntry,
   WorkspaceRef,
@@ -93,6 +96,33 @@ export const sessionExportSchema = {
           type: "string",
           maxLength: 4096,
           pattern: "^[a-z0-9][a-z0-9._-]*/[A-Za-z0-9](?:[A-Za-z0-9._:@/+-]*[A-Za-z0-9._:@+-])?$",
+        },
+      },
+    },
+    basis: {
+      description:
+        "The source session as it was read, for the prefix check of a round trip (R-PORT-6).",
+      type: "object",
+      additionalProperties: false,
+      required: ["address", "entries", "digest"],
+      properties: {
+        address: {
+          description: "The session address that was read.",
+          type: "string",
+          maxLength: 4096,
+          pattern:
+            "^acp://[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?(?::[0-9]{1,5})?/[a-z0-9][a-z0-9._-]*/(?:[A-Za-z0-9._~-]|%[0-9A-Fa-f]{2})+$",
+        },
+        entries: {
+          description: "How many transcript entries the digest covers.",
+          type: "integer",
+          minimum: 0,
+          maximum: 10000,
+        },
+        digest: {
+          description: "SHA-256 of the canonical JSON of those entries.",
+          type: "string",
+          pattern: "^sha256:[0-9a-f]{64}$",
         },
       },
     },
@@ -188,6 +218,7 @@ const FORMAT = "acp-ferry/session-export";
 const SCHEME = "acp://";
 const ADDRESS = new RegExp(SESSION_ADDRESS_PATTERN, "u");
 const MODEL = new RegExp(MODEL_ID_PATTERN, "u");
+const DIGEST = new RegExp(SESSION_DIGEST_PATTERN, "u");
 const DATE_TIME =
   /^(\d{4})-(\d{2})-(\d{2})[Tt](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:[Zz]|([+-])(\d{2}):(\d{2}))$/;
 const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
@@ -223,17 +254,22 @@ type Failure = { readonly ok: false; readonly error: string };
  * @experimental
  */
 export function parseSessionExport(value: unknown): ParseResult<SessionExport> {
-  const root = readObject(value, "", [
-    "format",
-    "version",
-    "source",
-    "exportedAt",
-    "handoff",
-    "workspace",
-    "plan",
-    "entries",
-    "losses",
-  ]);
+  const root = readObject(
+    value,
+    "",
+    [
+      "format",
+      "version",
+      "source",
+      "exportedAt",
+      "handoff",
+      "workspace",
+      "plan",
+      "entries",
+      "losses",
+    ],
+    ["basis"],
+  );
   if (!root.ok) {
     return root;
   }
@@ -247,6 +283,12 @@ export function parseSessionExport(value: unknown): ParseResult<SessionExport> {
   const source = readSource(own(document, "source"));
   if (!source.ok) {
     return source;
+  }
+  const basis = Object.hasOwn(document, "basis")
+    ? readBasis(own(document, "basis"))
+    : { ok: true as const, value: undefined };
+  if (!basis.ok) {
+    return basis;
   }
   const exportedAt = readField(own(document, "exportedAt"), "exportedAt");
   if (!exportedAt.ok) {
@@ -296,6 +338,7 @@ export function parseSessionExport(value: unknown): ParseResult<SessionExport> {
       format: FORMAT,
       version: 0,
       source: source.value,
+      ...(basis.value === undefined ? {} : { basis: basis.value }),
       exportedAt: exportedAt.value,
       handoff: handoff.value,
       workspace: workspace.value,
@@ -329,6 +372,37 @@ function readSource(value: unknown): ParseResult<SessionExport["source"]> {
     return fail("source.model", "a model id provider/model");
   }
   return { ok: true, value: { address: toAddress(address.value), model: toModel(model.value) } };
+}
+
+function readBasis(value: unknown): ParseResult<SessionBasis> {
+  const basis = readObject(value, "basis", ["address", "entries", "digest"]);
+  if (!basis.ok) {
+    return basis;
+  }
+  const address = readField(own(basis.value, "address"), "basis.address");
+  if (!address.ok) {
+    return address;
+  }
+  if (!ADDRESS.test(address.value)) {
+    return fail("basis.address", "a session address acp://<host>/<agent>/<session>");
+  }
+  const entries = own(basis.value, "entries");
+  if (
+    typeof entries !== "number" ||
+    !Number.isInteger(entries) ||
+    entries < 0 ||
+    entries > SESSION_EXPORT_LIMITS.maxEntries
+  ) {
+    return fail("basis.entries", `an integer from 0 to ${SESSION_EXPORT_LIMITS.maxEntries}`);
+  }
+  const digest = own(basis.value, "digest");
+  if (typeof digest !== "string" || !DIGEST.test(digest)) {
+    return fail("basis.digest", "sha256: and 64 lowercase hexadecimal digits");
+  }
+  return {
+    ok: true,
+    value: { address: toAddress(address.value), entries, digest: toDigest(digest) },
+  };
 }
 
 function readHandoff(value: unknown): ParseResult<HandoffMode> {
@@ -581,6 +655,11 @@ function toAddress(text: string): SessionAddressString {
   const first = rest.indexOf("/");
   const second = rest.indexOf("/", first + 1);
   return `${SCHEME}${rest.slice(0, first)}/${rest.slice(first + 1, second)}/${rest.slice(second + 1)}`;
+}
+
+/** Rebuilds a checked digest so that its type is the template literal type. */
+function toDigest(text: string): SessionDigest {
+  return `sha256:${text.slice("sha256:".length)}`;
 }
 
 /** Rebuilds a checked model id so that its type is the template literal type. */

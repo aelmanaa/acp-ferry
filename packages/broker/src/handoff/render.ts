@@ -201,21 +201,96 @@ export function parseHandoffMarker(text: string): ParseResult<string> {
  * @experimental
  */
 export function renderSeedPrompt(doc: SessionExport, options: RenderSeedPromptOptions): SeedPrompt {
-  const marker = formatHandoffMarker(options.handoffId);
   const mode = options.mode ?? doc.handoff;
   const recentTurns =
     positiveInteger("recentTurns", options.recentTurns) ?? SEED_PROMPT_DEFAULTS.recentTurns;
   const budget =
     positiveInteger("maxCharacters", options.maxCharacters) ??
     (mode === "summary+recent" ? SEED_PROMPT_DEFAULTS.maxCharacters : undefined);
+  return renderPrompt(doc, options, {
+    mode,
+    recentTurns,
+    budget,
+    top: (marker, sink) => headerTop(doc, marker, mode, recentTurns, sink),
+    closing: CLOSING,
+  });
+}
+
+/**
+ * Options of {@link renderHandBackPrompt}.
+ *
+ * @experimental
+ */
+export interface RenderHandBackPromptOptions {
+  /** The id of this hand-back, written in the marker line. Same rules as a handoff id. */
+  readonly handoffId: string;
+  /**
+   * The most characters kept of each tool input and output. Defaults to
+   * {@link SEED_PROMPT_DEFAULTS}.`maxToolTextCharacters`.
+   */
+  readonly maxToolTextCharacters?: number;
+}
+
+/**
+ * Renders the turns a moved session added as one prompt for the original session, the hand-back
+ * prompt (R-PORT-6). `turns` is an export of the moved session that holds only the new entries.
+ *
+ * The prompt has the same form as a `full-transcript` seed prompt: the marker line, the source
+ * session, the workspace, the plan and the losses, then every new entry in a fenced, redacted
+ * history block. It has no character budget, so no new turn is left out; each tool input and
+ * output is still cut to `maxToolTextCharacters`.
+ *
+ * @param turns - The moved session's export, with `entries` cut to the new entries.
+ * @param options - The hand-back id and the tool text limit.
+ * @returns The text, the marker line and what the text cut or redacted.
+ * @throws RangeError when `handoffId` or `maxToolTextCharacters` is invalid.
+ * @example
+ * ```ts
+ * const prompt = renderHandBackPrompt(
+ *   { ...movedExport, entries: movedExport.entries.slice(firstNew) },
+ *   { handoffId: "9b1d7c40" },
+ * );
+ * prompt.marker; // "acp-ferry handoff 9b1d7c40"
+ * ```
+ * @experimental
+ */
+export function renderHandBackPrompt(
+  turns: SessionExport,
+  options: RenderHandBackPromptOptions,
+): SeedPrompt {
+  return renderPrompt(turns, options, {
+    mode: "full-transcript",
+    recentTurns: SEED_PROMPT_DEFAULTS.recentTurns,
+    budget: undefined,
+    top: (marker, sink) => handBackTop(turns, marker, sink),
+    closing: HAND_BACK_CLOSING,
+  });
+}
+
+/** What differs between a seed prompt and a hand-back prompt. */
+interface Frame {
+  readonly mode: HandoffMode;
+  readonly recentTurns: number;
+  readonly budget: number | undefined;
+  readonly top: (marker: string, sink: Sink) => string;
+  readonly closing: string;
+}
+
+function renderPrompt(
+  doc: SessionExport,
+  options: { readonly handoffId: string; readonly maxToolTextCharacters?: number },
+  frame: Frame,
+): SeedPrompt {
+  const marker = formatHandoffMarker(options.handoffId);
+  const { mode, recentTurns, budget } = frame;
   const toolMax =
     positiveInteger("maxToolTextCharacters", options.maxToolTextCharacters) ??
     SEED_PROMPT_DEFAULTS.maxToolTextCharacters;
 
   const header = new Sink();
-  const top = headerTop(doc, marker, mode, recentTurns, header);
+  const top = frame.top(marker, header);
   const bottom = `${headerBottom(doc, header)}<acp-ferry-history handoff="${options.handoffId}">\n`;
-  const end = `</acp-ferry-history>\n\n${CLOSING}`;
+  const end = `</acp-ferry-history>\n\n${frame.closing}`;
   const pieces = historyPieces(doc.entries, mode, recentTurns, toolMax);
   const labels = pieces.flatMap((piece) => (piece.label === undefined ? [] : [piece.label]));
   const fixed = codePoints(top) + codePoints(bottom) + codePoints(end);
@@ -539,6 +614,26 @@ function headerTop(
     `Source: agent ${quote(agent, sink)}, model ${optional(doc.source.model, sink)}, session ${quote(doc.source.address, sink)}, exported at ${quote(doc.exportedAt, sink)}.`,
     `Workspace at export: directory ${quote(workspace.cwd, sink)}, branch ${optional(workspace.branch, sink)}, commit ${optional(workspace.commit, sink)}, uncommitted changes: ${workspace.dirty ? "yes" : "no"}. It may have changed since; check it before you rely on it.`,
     modeLine,
+    "",
+  ].join("\n");
+}
+
+const HAND_BACK_CLOSING =
+  "The returned turns end here. Do not change files or run commands yet. Reply with a short summary of where the work stands now and the next step you propose, then wait for the user's next message.\n";
+
+function handBackTop(doc: SessionExport, marker: string, sink: Sink): string {
+  const address = parseSessionAddress(doc.source.address);
+  const agent = address.ok ? address.value.agent : "another agent";
+  const { workspace } = doc;
+  const count = doc.entries.length;
+  return [
+    marker,
+    "",
+    `This message brings back the work done in ${agent} since this session was moved there. acp-ferry, a local tool the user runs, wrote it from that session. The user did not type it.`,
+    "",
+    `Moved session: agent ${quote(agent, sink)}, model ${optional(doc.source.model, sink)}, session ${quote(doc.source.address, sink)}, read at ${quote(doc.exportedAt, sink)}.`,
+    `Workspace when read: directory ${quote(workspace.cwd, sink)}, branch ${optional(workspace.branch, sink)}, commit ${optional(workspace.commit, sink)}, uncommitted changes: ${workspace.dirty ? "yes" : "no"}. It may have changed since; check it before you rely on it.`,
+    `The history below holds only the ${count === 1 ? "entry" : `${count} entries`} added there after this session was moved, in order. Everything before them is already in this session.`,
     "",
   ].join("\n");
 }
